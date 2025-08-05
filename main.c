@@ -1,355 +1,358 @@
-/* Прошивка для контроллера "радиопеленгатора" на основе MESH LORA сети
- * Входные данные - NMEA с GPS/GLONASS приемника
- * Связь между точками - MESH сеть с временным разделением
- * Для вывода информации используется смартфон, подключеный через BT HM-10
- * Контроллер - STM32F103C8T6
- * Среда разработки - Coocox v.1.7.8 + GCC 5.3 + StdPeriphLib v.3.5.0
- * Отладка - ST-Link v2 с Алиэкспресса, подключенный по SWD, либо клон CoLinkEx
- * USART1 - связь с терминалом на PC
- * USART2 - связь с BLE HM-10 (клон XM-10, без кварца)
- * USART3 - связь с GPS SIM-33ELA
- * SPI1 - связь с LORA модулем (RFM68)
+/* РџСЂРѕС€РёРІРєР° РґР»СЏ РєРѕРЅС‚СЂРѕР»Р»РµСЂР° "СЂР°РґРёРѕРїРµР»РµРЅРіР°С‚РѕСЂР°" РЅР° РѕСЃРЅРѕРІРµ MESH LORA СЃРµС‚Рё
+ * Р’С…РѕРґРЅС‹Рµ РґР°РЅРЅС‹Рµ - NMEA СЃ GPS/GLONASS РїСЂРёРµРјРЅРёРєР°
+ * РЎРІСЏР·СЊ РјРµР¶РґСѓ С‚РѕС‡РєР°РјРё - MESH СЃРµС‚СЊ СЃ РІСЂРµРјРµРЅРЅС‹Рј СЂР°Р·РґРµР»РµРЅРёРµРј
+ * Р”Р»СЏ РІС‹РІРѕРґР° РёРЅС„РѕСЂРјР°С†РёРё РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ СЃРјР°СЂС‚С„РѕРЅ, РїРѕРґРєР»СЋС‡РµРЅС‹Р№ С‡РµСЂРµР· BT HM-10
+ * РљРѕРЅС‚СЂРѕР»Р»РµСЂ - STM32F103C8T6
+ * РЎСЂРµРґР° СЂР°Р·СЂР°Р±РѕС‚РєРё - Coocox v.1.7.8 + GCC 5.3 + StdPeriphLib v.3.5.0
+ * РћС‚Р»Р°РґРєР° - ST-Link v2 СЃ РђР»РёСЌРєСЃРїСЂРµСЃСЃР°, РїРѕРґРєР»СЋС‡РµРЅРЅС‹Р№ РїРѕ SWD, Р»РёР±Рѕ РєР»РѕРЅ CoLinkEx
+ * USART1 - СЃРІСЏР·СЊ СЃ С‚РµСЂРјРёРЅР°Р»РѕРј РЅР° PC
+ * USART2 - СЃРІСЏР·СЊ СЃ BLE HM-10 (РєР»РѕРЅ XM-10, Р±РµР· РєРІР°СЂС†Р°)
+ * USART3 - СЃРІСЏР·СЊ СЃ GPS SIM-33ELA
+ * SPI1 - СЃРІСЏР·СЊ СЃ LORA РјРѕРґСѓР»РµРј (RFM68)
  * SPI2 -
- * I2C1 - OLED дисплей SSD1306
+ * I2C1 - OLED РґРёСЃРїР»РµР№ SSD1306
  * I2C2 -
- * ADC1 ch0 - измерение напряжения аккумулятора
- * ADC1 ch1 - измерение напряжения батареи резервного питания
+ * ADC1 ch0 - РёР·РјРµСЂРµРЅРёРµ РЅР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°
+ * ADC1 ch1 - РёР·РјРµСЂРµРЅРёРµ РЅР°РїСЂСЏР¶РµРЅРёСЏ Р±Р°С‚Р°СЂРµРё СЂРµР·РµСЂРІРЅРѕРіРѕ РїРёС‚Р°РЅРёСЏ
  *
- *  14.05.2016	v0.1	UART, парсинг NMEA
- *  02.06.2016	v0.2	добавлены таймеры
- *  11.06.2016	v0.3	добавлены SPI, радиомодуль RFM98
- *  18.12.2016  v1.0    переход на синие платы v0.1
- *  15.02.2017  v1.1	перенос проекта в Dropbox, причесывание исходников
- *  20.02.2017  v1.2   	добавлен I2C и OLED дисплей SSD1306
- *  21.02.2017	v1.3	добавлен ADC
- *  23.02.2017  v1.4	добавлены часы реального времени RTC
- *  08.03.2017	v1.5	добавлен парсер GSA сентенции (DOP)
- *  10.03.2017	v1.6 	добавлено внешнее прерывание от 1PPS, синхронизация RTC
- *  21.03.2017  v1.7 	добавлен LORA трансивер
- *  29.03.2017  v1.8 	добавлен BLE модуль XC-10 на чипе CC41-A
- *  28.06.2017	v1.9	исправление багов при настройке GPS и RTC
- *  25.06.2017 	v1.10	отказ от RTC, переход на обычный таймер
- *  01.08.2017  v1.11	добавлен парсинг строк GLONASS спутников 
- *  06.08.2017	v1.12	передача посылок по радиоканалу
- *  30.11.2017	v1.13	прием посылок от других маяков, фикс бага некоторых дисплеев, индикация заряда
- *  03.12.2017	v1.14	передача и прием координат, ретрансляция
- *  09.12.2017	v1.15   корректное измерение PER
- *  11.12.2017 	v1.16	добавлена тригонометрия для вычислений расстояний между маяками
- *  16.12.2017	v1.17	добавлен график напряжения аккумулятора от времени, выявлен баг с джиттером времени работы передатчика
- *  17.12.2017	v1.18	I2C для дисплея через DMA
- *	30.12.2017	v1.19	измерение PER еще корректнее, добавлена осциллограмма напряжения батареи
- *	02.01.2018	v1.20	время в логе батареи изменено с GPS на системное, добавлено выключение дисплея по таймауту
- *  04.05.2018	v1.21   улучшен вывод информации на дисплей, мелкие исправления.
- *  10.06.2018	v1.22	переход на GCC 7.0
- *  01.09.2018	v1.23	Добавлен Release режим отображения экранов. Для входа в него при запуске удерживать кнопку SCREEN
- *  08.09.2018	v1.24	Для контроля прохождения посылок по сети добавлен счетчик пакетов. В конце каждой посылки маяк добавляет 1 байт счетчик 0..255
+ *  14.05.2016	v0.1	UART, РїР°СЂСЃРёРЅРі NMEA
+ *  02.06.2016	v0.2	РґРѕР±Р°РІР»РµРЅС‹ С‚Р°Р№РјРµСЂС‹
+ *  11.06.2016	v0.3	РґРѕР±Р°РІР»РµРЅС‹ SPI, СЂР°РґРёРѕРјРѕРґСѓР»СЊ RFM98
+ *  18.12.2016  v1.0    РїРµСЂРµС…РѕРґ РЅР° СЃРёРЅРёРµ РїР»Р°С‚С‹ v0.1
+ *  15.02.2017  v1.1	РїРµСЂРµРЅРѕСЃ РїСЂРѕРµРєС‚Р° РІ Dropbox, РїСЂРёС‡РµСЃС‹РІР°РЅРёРµ РёСЃС…РѕРґРЅРёРєРѕРІ
+ *  20.02.2017  v1.2   	РґРѕР±Р°РІР»РµРЅ I2C Рё OLED РґРёСЃРїР»РµР№ SSD1306
+ *  21.02.2017	v1.3	РґРѕР±Р°РІР»РµРЅ ADC
+ *  23.02.2017  v1.4	РґРѕР±Р°РІР»РµРЅС‹ С‡Р°СЃС‹ СЂРµР°Р»СЊРЅРѕРіРѕ РІСЂРµРјРµРЅРё RTC
+ *  08.03.2017	v1.5	РґРѕР±Р°РІР»РµРЅ РїР°СЂСЃРµСЂ GSA СЃРµРЅС‚РµРЅС†РёРё (DOP)
+ *  10.03.2017	v1.6 	РґРѕР±Р°РІР»РµРЅРѕ РІРЅРµС€РЅРµРµ РїСЂРµСЂС‹РІР°РЅРёРµ РѕС‚ 1PPS, СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ RTC
+ *  21.03.2017  v1.7 	РґРѕР±Р°РІР»РµРЅ LORA С‚СЂР°РЅСЃРёРІРµСЂ
+ *  29.03.2017  v1.8 	РґРѕР±Р°РІР»РµРЅ BLE РјРѕРґСѓР»СЊ XC-10 РЅР° С‡РёРїРµ CC41-A
+ *  28.06.2017	v1.9	РёСЃРїСЂР°РІР»РµРЅРёРµ Р±Р°РіРѕРІ РїСЂРё РЅР°СЃС‚СЂРѕР№РєРµ GPS Рё RTC
+ *  25.06.2017 	v1.10	РѕС‚РєР°Р· РѕС‚ RTC, РїРµСЂРµС…РѕРґ РЅР° РѕР±С‹С‡РЅС‹Р№ С‚Р°Р№РјРµСЂ
+ *  01.08.2017  v1.11	РґРѕР±Р°РІР»РµРЅ РїР°СЂСЃРёРЅРі СЃС‚СЂРѕРє GLONASS СЃРїСѓС‚РЅРёРєРѕРІ
+ *  06.08.2017	v1.12	РїРµСЂРµРґР°С‡Р° РїРѕСЃС‹Р»РѕРє РїРѕ СЂР°РґРёРѕРєР°РЅР°Р»Сѓ
+ *  30.11.2017	v1.13	РїСЂРёРµРј РїРѕСЃС‹Р»РѕРє РѕС‚ РґСЂСѓРіРёС… РјР°СЏРєРѕРІ, С„РёРєСЃ Р±Р°РіР° РЅРµРєРѕС‚РѕСЂС‹С… РґРёСЃРїР»РµРµРІ, РёРЅРґРёРєР°С†РёСЏ Р·Р°СЂСЏРґР°
+ *  03.12.2017	v1.14	РїРµСЂРµРґР°С‡Р° Рё РїСЂРёРµРј РєРѕРѕСЂРґРёРЅР°С‚, СЂРµС‚СЂР°РЅСЃР»СЏС†РёСЏ
+ *  09.12.2017	v1.15   РєРѕСЂСЂРµРєС‚РЅРѕРµ РёР·РјРµСЂРµРЅРёРµ PER
+ *  11.12.2017 	v1.16	РґРѕР±Р°РІР»РµРЅР° С‚СЂРёРіРѕРЅРѕРјРµС‚СЂРёСЏ РґР»СЏ РІС‹С‡РёСЃР»РµРЅРёР№ СЂР°СЃСЃС‚РѕСЏРЅРёР№ РјРµР¶РґСѓ РјР°СЏРєР°РјРё
+ *  16.12.2017	v1.17	РґРѕР±Р°РІР»РµРЅ РіСЂР°С„РёРє РЅР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РѕС‚ РІСЂРµРјРµРЅРё, РІС‹СЏРІР»РµРЅ Р±Р°Рі СЃ РґР¶РёС‚С‚РµСЂРѕРј РІСЂРµРјРµРЅРё СЂР°Р±РѕС‚С‹ РїРµСЂРµРґР°С‚С‡РёРєР°
+ *  17.12.2017	v1.18	I2C РґР»СЏ РґРёСЃРїР»РµСЏ С‡РµСЂРµР· DMA
+ *	30.12.2017	v1.19	РёР·РјРµСЂРµРЅРёРµ PER РµС‰Рµ РєРѕСЂСЂРµРєС‚РЅРµРµ, РґРѕР±Р°РІР»РµРЅР° РѕСЃС†РёР»Р»РѕРіСЂР°РјРјР° РЅР°РїСЂСЏР¶РµРЅРёСЏ Р±Р°С‚Р°СЂРµРё
+ *	02.01.2018	v1.20	РІСЂРµРјСЏ РІ Р»РѕРіРµ Р±Р°С‚Р°СЂРµРё РёР·РјРµРЅРµРЅРѕ СЃ GPS РЅР° СЃРёСЃС‚РµРјРЅРѕРµ, РґРѕР±Р°РІР»РµРЅРѕ РІС‹РєР»СЋС‡РµРЅРёРµ РґРёСЃРїР»РµСЏ РїРѕ С‚Р°Р№РјР°СѓС‚Сѓ
+ *  04.05.2018	v1.21   СѓР»СѓС‡С€РµРЅ РІС‹РІРѕРґ РёРЅС„РѕСЂРјР°С†РёРё РЅР° РґРёСЃРїР»РµР№, РјРµР»РєРёРµ РёСЃРїСЂР°РІР»РµРЅРёСЏ.
+ *  10.06.2018	v1.22	РїРµСЂРµС…РѕРґ РЅР° GCC 7.0
+ *  01.09.2018	v1.23	Р”РѕР±Р°РІР»РµРЅ Release СЂРµР¶РёРј РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ СЌРєСЂР°РЅРѕРІ. Р”Р»СЏ РІС…РѕРґР° РІ РЅРµРіРѕ РїСЂРё Р·Р°РїСѓСЃРєРµ СѓРґРµСЂР¶РёРІР°С‚СЊ РєРЅРѕРїРєСѓ SCREEN
+ *  08.09.2018	v1.24	Р”Р»СЏ РєРѕРЅС‚СЂРѕР»СЏ РїСЂРѕС…РѕР¶РґРµРЅРёСЏ РїРѕСЃС‹Р»РѕРє РїРѕ СЃРµС‚Рё РґРѕР±Р°РІР»РµРЅ СЃС‡РµС‚С‡РёРє РїР°РєРµС‚РѕРІ. Р’ РєРѕРЅС†Рµ РєР°Р¶РґРѕР№ РїРѕСЃС‹Р»РєРё РјР°СЏРє РґРѕР±Р°РІР»СЏРµС‚ 1 Р±Р°Р№С‚ СЃС‡РµС‚С‡РёРє 0..255
  *  todo
- *  		добавить измерение температуры датчиком в АЦП STM32
- *  		//отображать напряжение аккумулятора при старте
- *  		добавить адаптивную регулировку мощности передатчика
- *  		пофиксить баг с включением передатчика при LORA_TX_TIME = 0 при первоначальном усреднении 1PPS
- *  		добавить в счетчик секунд полную дату для корректного перехода через 00 часов
- *  		разобраться с нестабильной работой BLE
- *  		// измерить погрешность вычисления координат и расстояний
- *  		//исследовать эффективность спиральных антенн
- *  		и зависимость дальности связи от параметров модуляции  LORA
- *  		иногда неправильно инициализируется дисплей ( чаще у маяка 2. Исправляется добавлением задержки перед инициализацией дисплея, но не всегда)
+ *  		РґРѕР±Р°РІРёС‚СЊ РёР·РјРµСЂРµРЅРёРµ С‚РµРјРїРµСЂР°С‚СѓСЂС‹ РґР°С‚С‡РёРєРѕРј РІ РђР¦Рџ STM32
+ *  		//РѕС‚РѕР±СЂР°Р¶Р°С‚СЊ РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РїСЂРё СЃС‚Р°СЂС‚Рµ
+ *  		РґРѕР±Р°РІРёС‚СЊ Р°РґР°РїС‚РёРІРЅСѓСЋ СЂРµРіСѓР»РёСЂРѕРІРєСѓ РјРѕС‰РЅРѕСЃС‚Рё РїРµСЂРµРґР°С‚С‡РёРєР°
+ *  		РїРѕС„РёРєСЃРёС‚СЊ Р±Р°Рі СЃ РІРєР»СЋС‡РµРЅРёРµРј РїРµСЂРµРґР°С‚С‡РёРєР° РїСЂРё LORA_TX_TIME = 0 РїСЂРё РїРµСЂРІРѕРЅР°С‡Р°Р»СЊРЅРѕРј СѓСЃСЂРµРґРЅРµРЅРёРё 1PPS
+ *  		РґРѕР±Р°РІРёС‚СЊ РІ СЃС‡РµС‚С‡РёРє СЃРµРєСѓРЅРґ РїРѕР»РЅСѓСЋ РґР°С‚Сѓ РґР»СЏ РєРѕСЂСЂРµРєС‚РЅРѕРіРѕ РїРµСЂРµС…РѕРґР° С‡РµСЂРµР· 00 С‡Р°СЃРѕРІ
+ *  		СЂР°Р·РѕР±СЂР°С‚СЊСЃСЏ СЃ РЅРµСЃС‚Р°Р±РёР»СЊРЅРѕР№ СЂР°Р±РѕС‚РѕР№ BLE
+ *  		// РёР·РјРµСЂРёС‚СЊ РїРѕРіСЂРµС€РЅРѕСЃС‚СЊ РІС‹С‡РёСЃР»РµРЅРёСЏ РєРѕРѕСЂРґРёРЅР°С‚ Рё СЂР°СЃСЃС‚РѕСЏРЅРёР№
+ *  		//РёСЃСЃР»РµРґРѕРІР°С‚СЊ СЌС„С„РµРєС‚РёРІРЅРѕСЃС‚СЊ СЃРїРёСЂР°Р»СЊРЅС‹С… Р°РЅС‚РµРЅРЅ
+ *  		Рё Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ РґР°Р»СЊРЅРѕСЃС‚Рё СЃРІСЏР·Рё РѕС‚ РїР°СЂР°РјРµС‚СЂРѕРІ РјРѕРґСѓР»СЏС†РёРё  LORA
+ *  		РёРЅРѕРіРґР° РЅРµРїСЂР°РІРёР»СЊРЅРѕ РёРЅРёС†РёР°Р»РёР·РёСЂСѓРµС‚СЃСЏ РґРёСЃРїР»РµР№ ( С‡Р°С‰Рµ Сѓ РјР°СЏРєР° 2. РСЃРїСЂР°РІР»СЏРµС‚СЃСЏ РґРѕР±Р°РІР»РµРЅРёРµРј Р·Р°РґРµСЂР¶РєРё РїРµСЂРµРґ РёРЅРёС†РёР°Р»РёР·Р°С†РёРµР№ РґРёСЃРїР»РµСЏ, РЅРѕ РЅРµ РІСЃРµРіРґР°)
  */
 
-#define LORA_TX_TIME 	3		// номер секунды для передачи (1-9)  3 - 03 13 23 33 43 53 03 и тд.  <----------------------------------------------------------------------------------------- TX TIME -----------------
-#define VersionMajor	1		// версия прошивки v1.24
-#define VersionMinor	24
-#define RFPowerDef		2		// мощность LORA трансиверов (от 2 до 17 dBm - от 1,6 до 50,1 mW)
-#define LcdOffTimeout 	180000	// время до выключения экрана, мс
+#define LORA_TX_TIME 3 // РЅРѕРјРµСЂ СЃРµРєСѓРЅРґС‹ РґР»СЏ РїРµСЂРµРґР°С‡Рё (1-9)  3 - 03 13 23 33 43 53 03 Рё С‚Рґ.  <----------------------------------------------------------------------------------------- TX TIME -----------------
+#define VersionMajor 1 // РІРµСЂСЃРёСЏ РїСЂРѕС€РёРІРєРё v1.24
+#define VersionMinor 24
+#define RFPowerDef 2		 // РјРѕС‰РЅРѕСЃС‚СЊ LORA С‚СЂР°РЅСЃРёРІРµСЂРѕРІ (РѕС‚ 2 РґРѕ 17 dBm - РѕС‚ 1,6 РґРѕ 50,1 mW)
+#define LcdOffTimeout 180000 // РІСЂРµРјСЏ РґРѕ РІС‹РєР»СЋС‡РµРЅРёСЏ СЌРєСЂР°РЅР°, РјСЃ
 
-//  вывод отладочной информации в USART1
-//#define DebugGpsToUart1				// вывод отладочной информации от GPS
-//#define Debug1PPSMeasurementToUART	// вывод отладочной информации об измерении длительности 1PPS
-//#define DebugLORAToUART				// вывод отладочной информации о работе радиомодуля LORA
+//  РІС‹РІРѕРґ РѕС‚Р»Р°РґРѕС‡РЅРѕР№ РёРЅС„РѕСЂРјР°С†РёРё РІ USART1
+// #define DebugGpsToUart1				// РІС‹РІРѕРґ РѕС‚Р»Р°РґРѕС‡РЅРѕР№ РёРЅС„РѕСЂРјР°С†РёРё РѕС‚ GPS
+// #define Debug1PPSMeasurementToUART	// РІС‹РІРѕРґ РѕС‚Р»Р°РґРѕС‡РЅРѕР№ РёРЅС„РѕСЂРјР°С†РёРё РѕР± РёР·РјРµСЂРµРЅРёРё РґР»РёС‚РµР»СЊРЅРѕСЃС‚Рё 1PPS
+// #define DebugLORAToUART				// РІС‹РІРѕРґ РѕС‚Р»Р°РґРѕС‡РЅРѕР№ РёРЅС„РѕСЂРјР°С†РёРё Рѕ СЂР°Р±РѕС‚Рµ СЂР°РґРёРѕРјРѕРґСѓР»СЏ LORA
 
-#include "stm32f10x.h"			// ядро
-#include "stm32f10x_flash.h"	// работа с flash памятью программ
-#include "stm32f10x_gpio.h"		// порты ввода-вывода
-#include "stm32f10x_rcc.h"		// система тактирования
-#include "stm32f10x_tim.h"		// таймеры
-#include "stm32f10x_usart.h"	// интерфейсы USART
-#include "stm32f10x_spi.h"		// SPI
-#include "stm32f10x_adc.h"		// ADC
-#include "stm32f10x_exti.h"		// Внешние прерывания EXTI
-#include "stm32f10x_dma.h"		// DMA ( используется для i2c дисплея )
-#include "misc.h"				// прерывания
-#include "stdio.h"				// printf  добавлено rprintfInit()
-#include "string.h"				// работа со строками
-#include <stdlib.h>				// типы данных, константы и тд.
-#include <math.h>				// математика
-#include <stdbool.h>			// определение типа bool
+#include "stm32f10x.h"		 // СЏРґСЂРѕ
+#include "stm32f10x_flash.h" // СЂР°Р±РѕС‚Р° СЃ flash РїР°РјСЏС‚СЊСЋ РїСЂРѕРіСЂР°РјРј
+#include "stm32f10x_gpio.h"	 // РїРѕСЂС‚С‹ РІРІРѕРґР°-РІС‹РІРѕРґР°
+#include "stm32f10x_rcc.h"	 // СЃРёСЃС‚РµРјР° С‚Р°РєС‚РёСЂРѕРІР°РЅРёСЏ
+#include "stm32f10x_tim.h"	 // С‚Р°Р№РјРµСЂС‹
+#include "stm32f10x_usart.h" // РёРЅС‚РµСЂС„РµР№СЃС‹ USART
+#include "stm32f10x_spi.h"	 // SPI
+#include "stm32f10x_adc.h"	 // ADC
+#include "stm32f10x_exti.h"	 // Р’РЅРµС€РЅРёРµ РїСЂРµСЂС‹РІР°РЅРёСЏ EXTI
+#include "stm32f10x_dma.h"	 // DMA ( РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РґР»СЏ i2c РґРёСЃРїР»РµСЏ )
+#include "misc.h"			 // РїСЂРµСЂС‹РІР°РЅРёСЏ
+#include "stdio.h"			 // printf  РґРѕР±Р°РІР»РµРЅРѕ rprintfInit()
+#include "string.h"			 // СЂР°Р±РѕС‚Р° СЃРѕ СЃС‚СЂРѕРєР°РјРё
+#include <stdlib.h>			 // С‚РёРїС‹ РґР°РЅРЅС‹С…, РєРѕРЅСЃС‚Р°РЅС‚С‹ Рё С‚Рґ.
+#include <math.h>			 // РјР°С‚РµРјР°С‚РёРєР°
+#include <stdbool.h>		 // РѕРїСЂРµРґРµР»РµРЅРёРµ С‚РёРїР° bool
 
-#include "sx1276.h"				// драйвер LORA модулей
+#include "sx1276.h" // РґСЂР°Р№РІРµСЂ LORA РјРѕРґСѓР»РµР№
 #include "sx1276-LoRa.h"
 #include "sx1276-LoRaMisc.h"
 #include "platform.h"
 #include "radio.h"
 
-#include "ssd1306.h" 			// OLED SSD1306
+#include "ssd1306.h" // OLED SSD1306
 
-// прототипы функций
-void init						(void);
-void RCC_Configuration 			(void);
-void DMA_Configuration			(void);
-void NVIC_Configuration 		(void);
-void PortIO_Configuration		(void);
-void USART1_Configuration		(void);
-void USART2_Configuration		(void);
-void USART2_Configuration115200	(void);
-void USART3_Configuration		(void);
-void USART3_Configuration115200	(void);
-void RTC_Configuration			(void);
-void TIM1_Configuration			(void);
-void TIM2_Configuration			(void);
-void TIM3_Configuration			(void);
-void TIM4_Configuration			(void);
-void SPI1_Configuration			(void);
-void ADC1_Configuration			(void);
-void EXTI_Configuration			(void);
+// РїСЂРѕС‚РѕС‚РёРїС‹ С„СѓРЅРєС†РёР№
+void init(void);
+void RCC_Configuration(void);
+void DMA_Configuration(void);
+void NVIC_Configuration(void);
+void PortIO_Configuration(void);
+void USART1_Configuration(void);
+void USART2_Configuration(void);
+void USART2_Configuration115200(void);
+void USART3_Configuration(void);
+void USART3_Configuration115200(void);
+void RTC_Configuration(void);
+void TIM1_Configuration(void);
+void TIM2_Configuration(void);
+void TIM3_Configuration(void);
+void TIM4_Configuration(void);
+void SPI1_Configuration(void);
+void ADC1_Configuration(void);
+void EXTI_Configuration(void);
 
-void USART_SendByte 		(USART_TypeDef* USARTx, u16 Data);
-void USART1_SendByte 		(char byte);
-void USART2_SendByte 		(char byte);
-void USART3_SendByte 		(char byte);
+void USART_SendByte(USART_TypeDef *USARTx, u16 Data);
+void USART1_SendByte(char byte);
+void USART2_SendByte(char byte);
+void USART3_SendByte(char byte);
 
-u8 USART_Scanf				(u32 value);
-void Time_Display			(u32 TimeVar);
-void Time_Display2			(u32 TimeVar); 	// без секунд
+u8 USART_Scanf(u32 value);
+void Time_Display(u32 TimeVar);
+void Time_Display2(u32 TimeVar); // Р±РµР· СЃРµРєСѓРЅРґ
 
-void DelayMS				(u16 delay);	// блокирующая задержка в мс на SysTick
+void DelayMS(u16 delay); // Р±Р»РѕРєРёСЂСѓСЋС‰Р°СЏ Р·Р°РґРµСЂР¶РєР° РІ РјСЃ РЅР° SysTick
 
-void OnVcc1 				(void); 	// Включить питание
-void OffVcc1 				(void); 	// Выключить питание
+void OnVcc1(void);	// Р’РєР»СЋС‡РёС‚СЊ РїРёС‚Р°РЅРёРµ
+void OffVcc1(void); // Р’С‹РєР»СЋС‡РёС‚СЊ РїРёС‚Р°РЅРёРµ
 
-void NRESET_on				(void);		// RESET SIM33ELA
-void NRESET_off				(void);
+void NRESET_on(void); // RESET SIM33ELA
+void NRESET_off(void);
 
-void OnLED0 				(void);
-void OffLED0 				(void);
-void CplLED0				(void);
+void OnLED0(void);
+void OffLED0(void);
+void CplLED0(void);
 
-void OnLED1 				(void);
-void OffLED1 				(void);
-void CplLED1				(void);
+void OnLED1(void);
+void OffLED1(void);
+void CplLED1(void);
 
-void OnTest					(void);
-void OffTest				(void);
-void CplTest				(void);
+void OnTest(void);
+void OffTest(void);
+void CplTest(void);
 
-void OnResetLORA			(void);
-void OffResetLORA			(void);
-void OnNssLORA				(void);
-void OffNssLORA				(void);
+void OnResetLORA(void);
+void OffResetLORA(void);
+void OnNssLORA(void);
+void OffNssLORA(void);
 
-void LoraProcess			(void);
-void LoraWriteReg			(u8 Addr, u8 Reg);
-u8	 LoraReadReg			(u8 Addr);
-void LoraWriteBuffer 		(u8 Addr, u8 *buffer, u8 size);
-void LoraReadBuffer 		(u8 Addr, u8 *buffer, u8 size);
-void LoraWriteFIFO 			(u8 *buffer, u8 size);
-void LoraReadFIFO 			(u8 *buffer, u8 size);
+void LoraProcess(void);
+void LoraWriteReg(u8 Addr, u8 Reg);
+u8 LoraReadReg(u8 Addr);
+void LoraWriteBuffer(u8 Addr, u8 *buffer, u8 size);
+void LoraReadBuffer(u8 Addr, u8 *buffer, u8 size);
+void LoraWriteFIFO(u8 *buffer, u8 size);
+void LoraReadFIFO(u8 *buffer, u8 size);
 
-void OnResetBLE 			(void);
-void OffResetBLE 			(void);
+void OnResetBLE(void);
+void OffResetBLE(void);
 
-u16  GetSamplesADC1			(void); // выборка АЦП todo доработать
-void OnDivGND1 				(void);
-void OffDivGND1				(void);
-void OnDivGND2 				(void);
-void OffDivGND2				(void);
+u16 GetSamplesADC1(void); // РІС‹Р±РѕСЂРєР° РђР¦Рџ todo РґРѕСЂР°Р±РѕС‚Р°С‚СЊ
+void OnDivGND1(void);
+void OffDivGND1(void);
+void OnDivGND2(void);
+void OffDivGND2(void);
 
-void Display1				(void); // вывод информации на экран
-void Display2				(void); // напряжения аккумулятора, батарейки
-void Display3				(void); // время RTC
-void Display4				(void); // информация о спутниках
-void Display5				(void); // информация о спутниках в графическом виде
-void Display6				(void); // информация о спутниках, используемых в решении и параметрах DOP
-void Display7				(void); // координаты и высота в u32
-void Display8				(void); // тест измерения периода 1PPS
-void Display9				(void); // приемник LORA
-void Display10				(void); // принятые координаты
-void Display11				(void); // времена посылок
-void Display12				(void); // параметры принятых посылок
-void Display13				(void); // PER от каждого маяка
-void Display14				(void); // вычисление расстояния между маяками
-void Display15				(void); // уровни сигнала от маяков в графическом виде
+void Display1(void);  // РІС‹РІРѕРґ РёРЅС„РѕСЂРјР°С†РёРё РЅР° СЌРєСЂР°РЅ
+void Display2(void);  // РЅР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°, Р±Р°С‚Р°СЂРµР№РєРё
+void Display3(void);  // РІСЂРµРјСЏ RTC
+void Display4(void);  // РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ СЃРїСѓС‚РЅРёРєР°С…
+void Display5(void);  // РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ СЃРїСѓС‚РЅРёРєР°С… РІ РіСЂР°С„РёС‡РµСЃРєРѕРј РІРёРґРµ
+void Display6(void);  // РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ СЃРїСѓС‚РЅРёРєР°С…, РёСЃРїРѕР»СЊР·СѓРµРјС‹С… РІ СЂРµС€РµРЅРёРё Рё РїР°СЂР°РјРµС‚СЂР°С… DOP
+void Display7(void);  // РєРѕРѕСЂРґРёРЅР°С‚С‹ Рё РІС‹СЃРѕС‚Р° РІ u32
+void Display8(void);  // С‚РµСЃС‚ РёР·РјРµСЂРµРЅРёСЏ РїРµСЂРёРѕРґР° 1PPS
+void Display9(void);  // РїСЂРёРµРјРЅРёРє LORA
+void Display10(void); // РїСЂРёРЅСЏС‚С‹Рµ РєРѕРѕСЂРґРёРЅР°С‚С‹
+void Display11(void); // РІСЂРµРјРµРЅР° РїРѕСЃС‹Р»РѕРє
+void Display12(void); // РїР°СЂР°РјРµС‚СЂС‹ РїСЂРёРЅСЏС‚С‹С… РїРѕСЃС‹Р»РѕРє
+void Display13(void); // PER РѕС‚ РєР°Р¶РґРѕРіРѕ РјР°СЏРєР°
+void Display14(void); // РІС‹С‡РёСЃР»РµРЅРёРµ СЂР°СЃСЃС‚РѕСЏРЅРёСЏ РјРµР¶РґСѓ РјР°СЏРєР°РјРё
+void Display15(void); // СѓСЂРѕРІРЅРё СЃРёРіРЅР°Р»Р° РѕС‚ РјР°СЏРєРѕРІ РІ РіСЂР°С„РёС‡РµСЃРєРѕРј РІРёРґРµ
 
-void Display1Release		(void); // основной экран
-void Display2Release		(void); // расстояния между маяками
-void Display3Release		(void); // информация GPS
+void Display1Release(void); // РѕСЃРЅРѕРІРЅРѕР№ СЌРєСЂР°РЅ
+void Display2Release(void); // СЂР°СЃСЃС‚РѕСЏРЅРёСЏ РјРµР¶РґСѓ РјР°СЏРєР°РјРё
+void Display3Release(void); // РёРЅС„РѕСЂРјР°С†РёСЏ GPS
 
-void OLED_Putc1				(char c);
-void OLED_Putc2				(char c);
-void OLED_Putc3				(char c);
+void OLED_Putc1(char c);
+void OLED_Putc2(char c);
+void OLED_Putc3(char c);
 
-void InitMeasVoltage		(void); // первоначальное заполнение массива усреднения измеренными значениями
-void MeasVoltage			(void); // измерения напряжений аккумулятора и батареи
+void InitMeasVoltage(void); // РїРµСЂРІРѕРЅР°С‡Р°Р»СЊРЅРѕРµ Р·Р°РїРѕР»РЅРµРЅРёРµ РјР°СЃСЃРёРІР° СѓСЃСЂРµРґРЅРµРЅРёСЏ РёР·РјРµСЂРµРЅРЅС‹РјРё Р·РЅР°С‡РµРЅРёСЏРјРё
+void MeasVoltage(void);		// РёР·РјРµСЂРµРЅРёСЏ РЅР°РїСЂСЏР¶РµРЅРёР№ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° Рё Р±Р°С‚Р°СЂРµРё
 
-void ScanKeyPowerOff 		(void); // обработчик нажатия кнопки PowerOff
-void ScanKeySOS 			(void); // обработчик нажатия кнопки SOS
+void ScanKeyPowerOff(void); // РѕР±СЂР°Р±РѕС‚С‡РёРє РЅР°Р¶Р°С‚РёСЏ РєРЅРѕРїРєРё PowerOff
+void ScanKeySOS(void);		// РѕР±СЂР°Р±РѕС‚С‡РёРє РЅР°Р¶Р°С‚РёСЏ РєРЅРѕРїРєРё SOS
 
-void ReceiveGPS				(void); // разбор и декодирование данных от GPS
-void Measurement1PPS		(void);	// измерение и усреднение периода сигнала 1PPS
-void Average1PPS			(void);	// усреднение измеренных значений периода 1PPS
+void ReceiveGPS(void);		// СЂР°Р·Р±РѕСЂ Рё РґРµРєРѕРґРёСЂРѕРІР°РЅРёРµ РґР°РЅРЅС‹С… РѕС‚ GPS
+void Measurement1PPS(void); // РёР·РјРµСЂРµРЅРёРµ Рё СѓСЃСЂРµРґРЅРµРЅРёРµ РїРµСЂРёРѕРґР° СЃРёРіРЅР°Р»Р° 1PPS
+void Average1PPS(void);		// СѓСЃСЂРµРґРЅРµРЅРёРµ РёР·РјРµСЂРµРЅРЅС‹С… Р·РЅР°С‡РµРЅРёР№ РїРµСЂРёРѕРґР° 1PPS
 
-void ClearGPSBuffer			(void);	// очистка буфера UART GPS
+void ClearGPSBuffer(void); // РѕС‡РёСЃС‚РєР° Р±СѓС„РµСЂР° UART GPS
 
-void ClearBLEBuffer			(void);	// очистка буфера UART BLE
+void ClearBLEBuffer(void); // РѕС‡РёСЃС‚РєР° Р±СѓС„РµСЂР° UART BLE
 
 // ------------- NMEA PARCER ------------------------------
-u8  NMEA_Parser_GGA			(void);
-u8  NMEA_Parser_ZDA			(void);
-u8	NMEA_Parser_GSV_GPS		(void);
-u8 	NMEA_Parser_GSV_GLO		(void);
-u8	NMEA_Parser_GSA_GPS		(void);
-u8	NMEA_Parser_GSA_GLO		(void);
+u8 NMEA_Parser_GGA(void);
+u8 NMEA_Parser_ZDA(void);
+u8 NMEA_Parser_GSV_GPS(void);
+u8 NMEA_Parser_GSV_GLO(void);
+u8 NMEA_Parser_GSA_GPS(void);
+u8 NMEA_Parser_GSA_GLO(void);
 
-u8	ControlCheckSum			(u16 StartIndex);
+u8 ControlCheckSum(u16 StartIndex);
 
-u32 GetGPSTimeSec 			(void); // вычисление времени GPS из ZDA сентенции. Целые секунды
-u32 GetGPSTimeMilliSec 		(void); // вычисление времени GPS из ZDA сентенции. Миллисекунды
+u32 GetGPSTimeSec(void);	  // РІС‹С‡РёСЃР»РµРЅРёРµ РІСЂРµРјРµРЅРё GPS РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё. Р¦РµР»С‹Рµ СЃРµРєСѓРЅРґС‹
+u32 GetGPSTimeMilliSec(void); // РІС‹С‡РёСЃР»РµРЅРёРµ РІСЂРµРјРµРЅРё GPS РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё. РњРёР»Р»РёСЃРµРєСѓРЅРґС‹
 
 // ---------------------------- #define ---------------------------------------------
 
-#define GPSBUFLENGTH  (1000)       // Буфер побольше, чтобы влезли все нужные посылки (GSV особенно длинная)
-#define RESERVE (0)   // Можно удлинить поля структуры GPGGA_Struct, если изменится формат или при другой необходимости
-#define MAXSAT (64)   // Максимальное количество спутников, GPS + ГЛОНАСС, для массива параметров видимых спутников
-#define PARSAT (4)    // Номер, угол места, азимут, SNR, для массива параметров видимых спутников
-#define ONESAT "nnn"  // Максимальная длина одного поля массива параметров видимых спутников
+#define GPSBUFLENGTH (1000) // Р‘СѓС„РµСЂ РїРѕР±РѕР»СЊС€Рµ, С‡С‚РѕР±С‹ РІР»РµР·Р»Рё РІСЃРµ РЅСѓР¶РЅС‹Рµ РїРѕСЃС‹Р»РєРё (GSV РѕСЃРѕР±РµРЅРЅРѕ РґР»РёРЅРЅР°СЏ)
+#define RESERVE (0)			// РњРѕР¶РЅРѕ СѓРґР»РёРЅРёС‚СЊ РїРѕР»СЏ СЃС‚СЂСѓРєС‚СѓСЂС‹ GPGGA_Struct, РµСЃР»Рё РёР·РјРµРЅРёС‚СЃСЏ С„РѕСЂРјР°С‚ РёР»Рё РїСЂРё РґСЂСѓРіРѕР№ РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё
+#define MAXSAT (64)			// РњР°РєСЃРёРјР°Р»СЊРЅРѕРµ РєРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ, GPS + Р“Р›РћРќРђРЎРЎ, РґР»СЏ РјР°СЃСЃРёРІР° РїР°СЂР°РјРµС‚СЂРѕРІ РІРёРґРёРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ
+#define PARSAT (4)			// РќРѕРјРµСЂ, СѓРіРѕР» РјРµСЃС‚Р°, Р°Р·РёРјСѓС‚, SNR, РґР»СЏ РјР°СЃСЃРёРІР° РїР°СЂР°РјРµС‚СЂРѕРІ РІРёРґРёРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ
+#define ONESAT "nnn"		// РњР°РєСЃРёРјР°Р»СЊРЅР°СЏ РґР»РёРЅР° РѕРґРЅРѕРіРѕ РїРѕР»СЏ РјР°СЃСЃРёРІР° РїР°СЂР°РјРµС‚СЂРѕРІ РІРёРґРёРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ
 
-#define USE_SX1276_RADIO	// выбор радиомодуля для библиотеки LORA
-#define BUFFER_SIZE	256		// Define the payload size here LORA
-#define BW 250  	  		// ширина полосы сигнала для расчета ошибки по частоте, кГц. LORA
+#define USE_SX1276_RADIO // РІС‹Р±РѕСЂ СЂР°РґРёРѕРјРѕРґСѓР»СЏ РґР»СЏ Р±РёР±Р»РёРѕС‚РµРєРё LORA
+#define BUFFER_SIZE 256	 // Define the payload size here LORA
+#define BW 250			 // С€РёСЂРёРЅР° РїРѕР»РѕСЃС‹ СЃРёРіРЅР°Р»Р° РґР»СЏ СЂР°СЃС‡РµС‚Р° РѕС€РёР±РєРё РїРѕ С‡Р°СЃС‚РѕС‚Рµ, РєР“С†. LORA
 
-#define Terminal			USART1_SendByte
-#define BleUsart			USART2_SendByte
-#define GpsUsart 			USART3_SendByte
-#define OLED_font1 			OLED_Putc1  // шрифт 7x10 пикселей
-#define OLED_font2 			OLED_Putc2  // 		11x18
-#define OLED_font3 			OLED_Putc3  // 		16x26
+#define Terminal USART1_SendByte
+#define BleUsart USART2_SendByte
+#define GpsUsart USART3_SendByte
+#define OLED_font1 OLED_Putc1 // С€СЂРёС„С‚ 7x10 РїРёРєСЃРµР»РµР№
+#define OLED_font2 OLED_Putc2 // 		11x18
+#define OLED_font3 OLED_Putc3 // 		16x26
 
-#define BufferUSART1Size 	100 	// размер приемного буфера USART1
-#define BufferUSART2Size 	100 	// размер приемного буфера USART2
-#define BufferUSART3Size 	100 	// размер приемного буфера USART3
-#define BaudRateUSART1		115200	// скорость USART1  - связь с ПК, отладка через терминал
-#define BaudRateUSART2		9600	// скорость USART2  - связь с BLE, переключается на 115200
-#define BaudRateUSART3		9600	// скорость USART3  - связь с GPS, переключается на 115200
+#define BufferUSART1Size 100  // СЂР°Р·РјРµСЂ РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР° USART1
+#define BufferUSART2Size 100  // СЂР°Р·РјРµСЂ РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР° USART2
+#define BufferUSART3Size 100  // СЂР°Р·РјРµСЂ РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР° USART3
+#define BaudRateUSART1 115200 // СЃРєРѕСЂРѕСЃС‚СЊ USART1  - СЃРІСЏР·СЊ СЃ РџРљ, РѕС‚Р»Р°РґРєР° С‡РµСЂРµР· С‚РµСЂРјРёРЅР°Р»
+#define BaudRateUSART2 9600	  // СЃРєРѕСЂРѕСЃС‚СЊ USART2  - СЃРІСЏР·СЊ СЃ BLE, РїРµСЂРµРєР»СЋС‡Р°РµС‚СЃСЏ РЅР° 115200
+#define BaudRateUSART3 9600	  // СЃРєРѕСЂРѕСЃС‚СЊ USART3  - СЃРІСЏР·СЊ СЃ GPS, РїРµСЂРµРєР»СЋС‡Р°РµС‚СЃСЏ РЅР° 115200
 
-#define VaccPowerOff		3000 	// напряжение аккумулятора, при котором питание отключается
-#define VaccAttention		3100 	// напряжение аккумулятора, при котором при загрузке выдается предупреждение и дальнейшая работа устройства блокируется
+#define VaccPowerOff 3000  // РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°, РїСЂРё РєРѕС‚РѕСЂРѕРј РїРёС‚Р°РЅРёРµ РѕС‚РєР»СЋС‡Р°РµС‚СЃСЏ
+#define VaccAttention 3100 // РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°, РїСЂРё РєРѕС‚РѕСЂРѕРј РїСЂРё Р·Р°РіСЂСѓР·РєРµ РІС‹РґР°РµС‚СЃСЏ РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµ Рё РґР°Р»СЊРЅРµР№С€Р°СЏ СЂР°Р±РѕС‚Р° СѓСЃС‚СЂРѕР№СЃС‚РІР° Р±Р»РѕРєРёСЂСѓРµС‚СЃСЏ
 
-#define STOP 				for(;;){} // бесконечный пустой цикл, для отладки
+#define STOP \
+	for (;;) \
+	{        \
+	} // Р±РµСЃРєРѕРЅРµС‡РЅС‹Р№ РїСѓСЃС‚РѕР№ С†РёРєР», РґР»СЏ РѕС‚Р»Р°РґРєРё
 
-// ----------------------- Глобальные переменные -----------------------------------------------
+// ----------------------- Р“Р»РѕР±Р°Р»СЊРЅС‹Рµ РїРµСЂРµРјРµРЅРЅС‹Рµ -----------------------------------------------
 // ----------------- USART, TIM ---------------------------------------------------
-u8				NumberDev = LORA_TX_TIME;			// номер устройства		
+u8 NumberDev = LORA_TX_TIME; // РЅРѕРјРµСЂ СѓСЃС‚СЂРѕР№СЃС‚РІР°
 
-ErrorStatus 	HSEStartUpStatus;
+ErrorStatus HSEStartUpStatus;
 
-volatile u8 	triggerUSART1Interrupt = 0;
-volatile u16 	counterUSART1Buffer;
-volatile char	BufferUSART1RX[BufferUSART1Size+1] = {'\0'}; // приемный буфер USART1
+volatile u8 triggerUSART1Interrupt = 0;
+volatile u16 counterUSART1Buffer;
+volatile char BufferUSART1RX[BufferUSART1Size + 1] = {'\0'}; // РїСЂРёРµРјРЅС‹Р№ Р±СѓС„РµСЂ USART1
 
-volatile u8 	triggerUSART2Interrupt = 0;
-volatile u16 	counterUSART2Buffer;
-volatile char	BufferUSART2RX[BufferUSART2Size+1] = {'\0'}; // приемный буфер USART2
+volatile u8 triggerUSART2Interrupt = 0;
+volatile u16 counterUSART2Buffer;
+volatile char BufferUSART2RX[BufferUSART2Size + 1] = {'\0'}; // РїСЂРёРµРјРЅС‹Р№ Р±СѓС„РµСЂ USART2
 
-volatile u8 	triggerUSART3Interrupt = 0;
-volatile u16 	counterUSART3Buffer;
-//volatile char	BufferUSART3RX[BufferUSART3Size+1] = {'\0'}; // приемный буфер USART3
+volatile u8 triggerUSART3Interrupt = 0;
+volatile u16 counterUSART3Buffer;
+// volatile char	BufferUSART3RX[BufferUSART3Size+1] = {'\0'}; // РїСЂРёРµРјРЅС‹Р№ Р±СѓС„РµСЂ USART3
 
-volatile u32 	timer1ms, timer1s; 		// переменные системного таймера
+volatile u32 timer1ms, timer1s; // РїРµСЂРµРјРµРЅРЅС‹Рµ СЃРёСЃС‚РµРјРЅРѕРіРѕ С‚Р°Р№РјРµСЂР°
 
-volatile u8		triggerTIM2Interrupt;   // флаг прерывания по приему посылки от BLE модуля
-volatile u8		triggerTIM3Interrupt;   // флаг прерывания по приему посылки от GPS модуля
+volatile u8 triggerTIM2Interrupt; // С„Р»Р°Рі РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РїСЂРёРµРјСѓ РїРѕСЃС‹Р»РєРё РѕС‚ BLE РјРѕРґСѓР»СЏ
+volatile u8 triggerTIM3Interrupt; // С„Р»Р°Рі РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РїСЂРёРµРјСѓ РїРѕСЃС‹Р»РєРё РѕС‚ GPS РјРѕРґСѓР»СЏ
 
-volatile 		u32 SecRTC	;			// текущее время RTC в секундах
-u32 			SecRTCold;				// предыдущее значение времени. Для лога напряжения аккумулятора
-u32 			sec_RTC_to_display ;	// секунды от таймера для отображения
-u32 			sec_GPS_to_display ;	// секунды от GPS для отображения
+volatile u32 SecRTC;	// С‚РµРєСѓС‰РµРµ РІСЂРµРјСЏ RTC РІ СЃРµРєСѓРЅРґР°С…
+u32 SecRTCold;			// РїСЂРµРґС‹РґСѓС‰РµРµ Р·РЅР°С‡РµРЅРёРµ РІСЂРµРјРµРЅРё. Р”Р»СЏ Р»РѕРіР° РЅР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°
+u32 sec_RTC_to_display; // СЃРµРєСѓРЅРґС‹ РѕС‚ С‚Р°Р№РјРµСЂР° РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ
+u32 sec_GPS_to_display; // СЃРµРєСѓРЅРґС‹ РѕС‚ GPS РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ
 
-u32 i, j; 	// счетчик общего назначения
+u32 i, j; // СЃС‡РµС‚С‡РёРє РѕР±С‰РµРіРѕ РЅР°Р·РЅР°С‡РµРЅРёСЏ
 
-// --------------------------- переменные GPS приемника ----------------------------
-char 	GPSBuf[GPSBUFLENGTH];	// Буфер UART для посылок от GPS модуля
-volatile u16 GPSBufWrPoint; 	// Буфер не кольцевой, а линейный, нужна только точка записи
-u16	GSVStartPos = 0; 			// Эти переменные используются только в NMEA_Parser_GSV(), но обнуляются только
-//u16 GSVStartPosGLO = 0;		// В основной программе, потому эти переменные инкрементируются во время нескольких последовательных вызовов GSVStartPos
-u8 	SatNumGPS = 0;				// Количество спутников GPS
-u8 	SatNumGLO = 0;				// Количество спутников GLONASS
-u8 	SatFix = 0;	 				// Количество спутников, используемых в решении из GGA последовательности
-u8 	SatFixGPS = 0;	 			// Количество спутников GPS, используемых в решении из GSA
-u8 	SatFixGLO = 0;	 			// Количество спутников GLONASS, используемых в решении из GSA
-u8 	GSVNumStringGPS	 = 0; 		// Количество GSV строк по GPS 
-u8 	GSVNumStringGLO	 = 0;		// Количество GSV строк по GLONASS
+// --------------------------- РїРµСЂРµРјРµРЅРЅС‹Рµ GPS РїСЂРёРµРјРЅРёРєР° ----------------------------
+char GPSBuf[GPSBUFLENGTH];	// Р‘СѓС„РµСЂ UART РґР»СЏ РїРѕСЃС‹Р»РѕРє РѕС‚ GPS РјРѕРґСѓР»СЏ
+volatile u16 GPSBufWrPoint; // Р‘СѓС„РµСЂ РЅРµ РєРѕР»СЊС†РµРІРѕР№, Р° Р»РёРЅРµР№РЅС‹Р№, РЅСѓР¶РЅР° С‚РѕР»СЊРєРѕ С‚РѕС‡РєР° Р·Р°РїРёСЃРё
+u16 GSVStartPos = 0;		// Р­С‚Рё РїРµСЂРµРјРµРЅРЅС‹Рµ РёСЃРїРѕР»СЊР·СѓСЋС‚СЃСЏ С‚РѕР»СЊРєРѕ РІ NMEA_Parser_GSV(), РЅРѕ РѕР±РЅСѓР»СЏСЋС‚СЃСЏ С‚РѕР»СЊРєРѕ
+// u16 GSVStartPosGLO = 0;		// Р’ РѕСЃРЅРѕРІРЅРѕР№ РїСЂРѕРіСЂР°РјРјРµ, РїРѕС‚РѕРјСѓ СЌС‚Рё РїРµСЂРµРјРµРЅРЅС‹Рµ РёРЅРєСЂРµРјРµРЅС‚РёСЂСѓСЋС‚СЃСЏ РІРѕ РІСЂРµРјСЏ РЅРµСЃРєРѕР»СЊРєРёС… РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅС‹С… РІС‹Р·РѕРІРѕРІ GSVStartPos
+u8 SatNumGPS = 0;		// РљРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ GPS
+u8 SatNumGLO = 0;		// РљРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ GLONASS
+u8 SatFix = 0;			// РљРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ, РёСЃРїРѕР»СЊР·СѓРµРјС‹С… РІ СЂРµС€РµРЅРёРё РёР· GGA РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё
+u8 SatFixGPS = 0;		// РљРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ GPS, РёСЃРїРѕР»СЊР·СѓРµРјС‹С… РІ СЂРµС€РµРЅРёРё РёР· GSA
+u8 SatFixGLO = 0;		// РљРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ GLONASS, РёСЃРїРѕР»СЊР·СѓРµРјС‹С… РІ СЂРµС€РµРЅРёРё РёР· GSA
+u8 GSVNumStringGPS = 0; // РљРѕР»РёС‡РµСЃС‚РІРѕ GSV СЃС‚СЂРѕРє РїРѕ GPS
+u8 GSVNumStringGLO = 0; // РљРѕР»РёС‡РµСЃС‚РІРѕ GSV СЃС‚СЂРѕРє РїРѕ GLONASS
 
-struct GPGGA_Struct  		// Структура с данными GPS-ГЛОНАСС-модуля
+struct GPGGA_Struct // РЎС‚СЂСѓРєС‚СѓСЂР° СЃ РґР°РЅРЅС‹РјРё GPS-Р“Р›РћРќРђРЎРЎ-РјРѕРґСѓР»СЏ
 {
-  char Time [sizeof("hhmmss.ss")+RESERVE];      	// Время
-  char Latitude [sizeof("xxxx.yyyy")+RESERVE];    	// Широта
-  char NS;                            				// Север-Юг
-  char Longitude[sizeof("xxxxx.yyyy")+RESERVE]; 	// Долгота
-  char EW;                            				// Запад-Восток
-  char ReceiverMode;                    			// Режим работы приемника
-  char SatelliteNum [sizeof("nn")+RESERVE];     	// Количество спутников в решении
-  char Altitude [sizeof("aaaaa.a")+RESERVE];    	// Высота
-  char Year[sizeof("yyyy")+RESERVE];          		// Год
-  char Month[sizeof("mm")+RESERVE];         		// Месяц
-  char Day[sizeof("dd")+RESERVE];           		// Число
-  char LocalTimeHr [sizeof("+hh")+RESERVE];     	// Поправка на местное время, часы
-  char LocalTimeMn [sizeof("mm")+RESERVE];      	// Поправка на местное время, минуты
-  char Sats [MAXSAT][PARSAT][sizeof(ONESAT)];   	// Массив параметров видимых спутников GPS 
-  char SatsGLO [MAXSAT][PARSAT][sizeof(ONESAT)];   	// Массив параметров видимых спутников GLONASS
+	char Time[sizeof("hhmmss.ss") + RESERVE];		// Р’СЂРµРјСЏ
+	char Latitude[sizeof("xxxx.yyyy") + RESERVE];	// РЁРёСЂРѕС‚Р°
+	char NS;										// РЎРµРІРµСЂ-Р®Рі
+	char Longitude[sizeof("xxxxx.yyyy") + RESERVE]; // Р”РѕР»РіРѕС‚Р°
+	char EW;										// Р—Р°РїР°Рґ-Р’РѕСЃС‚РѕРє
+	char ReceiverMode;								// Р РµР¶РёРј СЂР°Р±РѕС‚С‹ РїСЂРёРµРјРЅРёРєР°
+	char SatelliteNum[sizeof("nn") + RESERVE];		// РљРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ РІ СЂРµС€РµРЅРёРё
+	char Altitude[sizeof("aaaaa.a") + RESERVE];		// Р’С‹СЃРѕС‚Р°
+	char Year[sizeof("yyyy") + RESERVE];			// Р“РѕРґ
+	char Month[sizeof("mm") + RESERVE];				// РњРµСЃСЏС†
+	char Day[sizeof("dd") + RESERVE];				// Р§РёСЃР»Рѕ
+	char LocalTimeHr[sizeof("+hh") + RESERVE];		// РџРѕРїСЂР°РІРєР° РЅР° РјРµСЃС‚РЅРѕРµ РІСЂРµРјСЏ, С‡Р°СЃС‹
+	char LocalTimeMn[sizeof("mm") + RESERVE];		// РџРѕРїСЂР°РІРєР° РЅР° РјРµСЃС‚РЅРѕРµ РІСЂРµРјСЏ, РјРёРЅСѓС‚С‹
+	char Sats[MAXSAT][PARSAT][sizeof(ONESAT)];		// РњР°СЃСЃРёРІ РїР°СЂР°РјРµС‚СЂРѕРІ РІРёРґРёРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GPS
+	char SatsGLO[MAXSAT][PARSAT][sizeof(ONESAT)];	// РњР°СЃСЃРёРІ РїР°СЂР°РјРµС‚СЂРѕРІ РІРёРґРёРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GLONASS
 };
 
-struct GPGGA_Struct GPSFixData; 	// С этой структурой и будем работать
-u8  SatLevelsGPS[40]; 				// уровни S/N со спутников GPS
-u8  SatIDGPS 	[40]; 				// номера видимых спутников GPS
-u8  SatLevelsGLO	[40];			// уровни S/N со спутников GLONASS
-u8  SatIDGLO 	[40]; 				// номера видимых спутников GLONASS
-u16 SatSummGPS, SatSummUsedGPS;		// сумма S/N видимых и используемых спутников GPS
-u16 SatSummGLO, SatSummUsedGLO;		// сумма S/N видимых и используемых спутников GLONASS
-u8	SatUsedGPS	[12];				// массив номеров использованных в решении спутников GPS
-u8	SatUsedGLO	[12];				// массив номеров использованных в решении спутников GLONASS
-u8	SatNumUsed;						// количество использованных в решении спутников
-u16	PDOP, VDOP, HDOP;				// коэффициенты ухудшения точности определения координат ( x100 )
-u8 	Fix;							// режим работы GPS приемника - 2D/3D/нет решения
-u8	AutoSel_2D3D;					// 1 - автоматический выбор 2D/3D, 0 - ручной
-u32 GPSTimeSec;						// количество секунд текущих суток из ZDA сентенции
-u32 GPSTimeMilliSec;				// количество миллисекунд из ZDA сентенции
-u32 GPSLongitude, GPSLatitude;		// текущие широта и долгота
-u8  GPS_N_S, GPS_E_W ;				// 1 - север, 0 - юг; 1 - запад, 0 - восток
-u32 GPSAltitude;					// текущая высота
-u16 TTFF;							// время до первой фиксации местоположения
+struct GPGGA_Struct GPSFixData; // РЎ СЌС‚РѕР№ СЃС‚СЂСѓРєС‚СѓСЂРѕР№ Рё Р±СѓРґРµРј СЂР°Р±РѕС‚Р°С‚СЊ
+u8 SatLevelsGPS[40];			// СѓСЂРѕРІРЅРё S/N СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ GPS
+u8 SatIDGPS[40];				// РЅРѕРјРµСЂР° РІРёРґРёРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GPS
+u8 SatLevelsGLO[40];			// СѓСЂРѕРІРЅРё S/N СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ GLONASS
+u8 SatIDGLO[40];				// РЅРѕРјРµСЂР° РІРёРґРёРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GLONASS
+u16 SatSummGPS, SatSummUsedGPS; // СЃСѓРјРјР° S/N РІРёРґРёРјС‹С… Рё РёСЃРїРѕР»СЊР·СѓРµРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GPS
+u16 SatSummGLO, SatSummUsedGLO; // СЃСѓРјРјР° S/N РІРёРґРёРјС‹С… Рё РёСЃРїРѕР»СЊР·СѓРµРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GLONASS
+u8 SatUsedGPS[12];				// РјР°СЃСЃРёРІ РЅРѕРјРµСЂРѕРІ РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… РІ СЂРµС€РµРЅРёРё СЃРїСѓС‚РЅРёРєРѕРІ GPS
+u8 SatUsedGLO[12];				// РјР°СЃСЃРёРІ РЅРѕРјРµСЂРѕРІ РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… РІ СЂРµС€РµРЅРёРё СЃРїСѓС‚РЅРёРєРѕРІ GLONASS
+u8 SatNumUsed;					// РєРѕР»РёС‡РµСЃС‚РІРѕ РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… РІ СЂРµС€РµРЅРёРё СЃРїСѓС‚РЅРёРєРѕРІ
+u16 PDOP, VDOP, HDOP;			// РєРѕСЌС„С„РёС†РёРµРЅС‚С‹ СѓС…СѓРґС€РµРЅРёСЏ С‚РѕС‡РЅРѕСЃС‚Рё РѕРїСЂРµРґРµР»РµРЅРёСЏ РєРѕРѕСЂРґРёРЅР°С‚ ( x100 )
+u8 Fix;							// СЂРµР¶РёРј СЂР°Р±РѕС‚С‹ GPS РїСЂРёРµРјРЅРёРєР° - 2D/3D/РЅРµС‚ СЂРµС€РµРЅРёСЏ
+u8 AutoSel_2D3D;				// 1 - Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ РІС‹Р±РѕСЂ 2D/3D, 0 - СЂСѓС‡РЅРѕР№
+u32 GPSTimeSec;					// РєРѕР»РёС‡РµСЃС‚РІРѕ СЃРµРєСѓРЅРґ С‚РµРєСѓС‰РёС… СЃСѓС‚РѕРє РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё
+u32 GPSTimeMilliSec;			// РєРѕР»РёС‡РµСЃС‚РІРѕ РјРёР»Р»РёСЃРµРєСѓРЅРґ РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё
+u32 GPSLongitude, GPSLatitude;	// С‚РµРєСѓС‰РёРµ С€РёСЂРѕС‚Р° Рё РґРѕР»РіРѕС‚Р°
+u8 GPS_N_S, GPS_E_W;			// 1 - СЃРµРІРµСЂ, 0 - СЋРі; 1 - Р·Р°РїР°Рґ, 0 - РІРѕСЃС‚РѕРє
+u32 GPSAltitude;				// С‚РµРєСѓС‰Р°СЏ РІС‹СЃРѕС‚Р°
+u16 TTFF;						// РІСЂРµРјСЏ РґРѕ РїРµСЂРІРѕР№ С„РёРєСЃР°С†РёРё РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёСЏ
 // --------------------------------------------------------------------------------
 char c1;
 u8 size;
 char m;
 
 int tempData = 0;
-char test [50];
+char test[50];
 
-bool triggerTTFF ;		// триггер измерения времени первой фиксации местоположения
-bool flagTX;			// флаг запуска передачи буфера на 433
+bool triggerTTFF; // С‚СЂРёРіРіРµСЂ РёР·РјРµСЂРµРЅРёСЏ РІСЂРµРјРµРЅРё РїРµСЂРІРѕР№ С„РёРєСЃР°С†РёРё РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёСЏ
+bool flagTX;	  // С„Р»Р°Рі Р·Р°РїСѓСЃРєР° РїРµСЂРµРґР°С‡Рё Р±СѓС„РµСЂР° РЅР° 433
 bool flagTXDisplay;
 bool flagRXDisplay;
-//----------------------------- переменные LORA ------------------------------------------
-u8 	LoraTxTime  = LORA_TX_TIME; // номер секунды для передачи в эфир
+//----------------------------- РїРµСЂРµРјРµРЅРЅС‹Рµ LORA ------------------------------------------
+u8 LoraTxTime = LORA_TX_TIME; // РЅРѕРјРµСЂ СЃРµРєСѓРЅРґС‹ РґР»СЏ РїРµСЂРµРґР°С‡Рё РІ СЌС„РёСЂ
 
-s8 	RFPower = RFPowerDef;		// мощность передатчика
+s8 RFPower = RFPowerDef; // РјРѕС‰РЅРѕСЃС‚СЊ РїРµСЂРµРґР°С‚С‡РёРєР°
 u16 SPI1read;
 
-u8  LORAbufferRX 	[256];
-u8  LORAbufferTX 	[256];
+u8 LORAbufferRX[256];
+u8 LORAbufferTX[256];
 
-static u16 BufferSize = BUFFER_SIZE;			// RF buffer size
-//static u8 Buffer[BUFFER_SIZE];				// RF buffer
-tRadioDriver *Radio = NULL;						// структура RadioDriver , указатели на функции
+static u16 BufferSize = BUFFER_SIZE; // RF buffer size
+// static u8 Buffer[BUFFER_SIZE];				// RF buffer
+tRadioDriver *Radio = NULL; // СЃС‚СЂСѓРєС‚СѓСЂР° RadioDriver , СѓРєР°Р·Р°С‚РµР»Рё РЅР° С„СѓРЅРєС†РёРё
 
 u8 temp1, temp2;
 u32 temp3;
@@ -357,613 +360,595 @@ u32 temp3;
 /*!
  * SX1276 LoRa registers variable
  */
-//extern tSX1276LR* SX1276LR;
-extern  u8 RFLRState;
+// extern tSX1276LR* SX1276LR;
+extern u8 RFLRState;
 
 u16 countPacket, countPacketOld, Power;
 u32 countOK, countERR;
 u32 PER1, PER2;
-//u32 PER;
+// u32 PER;
 u8 trigger_PER;
 u8 CRCerror;
-double FreqError;		// ошибка принятого сигнала по частоте
+double FreqError; // РѕС€РёР±РєР° РїСЂРёРЅСЏС‚РѕРіРѕ СЃРёРіРЅР°Р»Р° РїРѕ С‡Р°СЃС‚РѕС‚Рµ
 s32 FREQ_ERROR;
-bool flagRX_OK;			// флаг готовности новых данных в приемном буфере
+bool flagRX_OK; // С„Р»Р°Рі РіРѕС‚РѕРІРЅРѕСЃС‚Рё РЅРѕРІС‹С… РґР°РЅРЅС‹С… РІ РїСЂРёРµРјРЅРѕРј Р±СѓС„РµСЂРµ
 
-volatile u16 counterRXDisplay; 	// счетчик времени отображения RX на дисплее
-volatile u16 counterTXDisplay; 	// счетчик времени отображения TX на дисплее
-bool triggerOffLED0;			// триггеры для однократного выключения светодиодов
+volatile u16 counterRXDisplay; // СЃС‡РµС‚С‡РёРє РІСЂРµРјРµРЅРё РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ RX РЅР° РґРёСЃРїР»РµРµ
+volatile u16 counterTXDisplay; // СЃС‡РµС‚С‡РёРє РІСЂРµРјРµРЅРё РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ TX РЅР° РґРёСЃРїР»РµРµ
+bool triggerOffLED0;		   // С‚СЂРёРіРіРµСЂС‹ РґР»СЏ РѕРґРЅРѕРєСЂР°С‚РЅРѕРіРѕ РІС‹РєР»СЋС‡РµРЅРёСЏ СЃРІРµС‚РѕРґРёРѕРґРѕРІ
 bool triggerOffLED1;
-volatile u16 counterLed0;		// счетчик времени горения Синего светодиода
-volatile u16 counterLed1;		// счетчик времени горения Красного светодиода
+volatile u16 counterLed0; // СЃС‡РµС‚С‡РёРє РІСЂРµРјРµРЅРё РіРѕСЂРµРЅРёСЏ РЎРёРЅРµРіРѕ СЃРІРµС‚РѕРґРёРѕРґР°
+volatile u16 counterLed1; // СЃС‡РµС‚С‡РёРє РІСЂРµРјРµРЅРё РіРѕСЂРµРЅРёСЏ РљСЂР°СЃРЅРѕРіРѕ СЃРІРµС‚РѕРґРёРѕРґР°
 
+u32 LoraResult; // СЃРѕСЃС‚РѕСЏРЅРёРµ Р°РІС‚РѕРјР°С‚Р° СЃРѕСЃС‚РѕСЏРЅРёР№  LORA С‚СЂР°РЅСЃРёРІРµСЂР°
+// u32 LoraCounter ;			// С‚РµСЃС‚РѕРІС‹Р№ СЃС‡РµС‚С‡РёРє
 
-u32 LoraResult ;			// состояние автомата состояний  LORA трансивера
-//u32 LoraCounter ;			// тестовый счетчик
-
-typedef struct LoraRXstruct_t 		// структура параметров принятого сигнала от одного маяка
+typedef struct LoraRXstruct_t // СЃС‚СЂСѓРєС‚СѓСЂР° РїР°СЂР°РјРµС‚СЂРѕРІ РїСЂРёРЅСЏС‚РѕРіРѕ СЃРёРіРЅР°Р»Р° РѕС‚ РѕРґРЅРѕРіРѕ РјР°СЏРєР°
 {
-	s16		RSSI;		// измеренное значение уровня сигнала RSSI в принятом пакете
-	s32 	FreqError;	// относительное смещение по частоте принятого пакета
-	s8		SNR;		// соотношение сигнал/шум для принятого пакета
-	s8		Power;		// мощность излучения передатчика, передается в пакете
-	u8 		CounterTxP;	// счетчик переданных пакетов. Временно todo
-}LoraRXstruct;
+	s16 RSSI;	   // РёР·РјРµСЂРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ СѓСЂРѕРІРЅСЏ СЃРёРіРЅР°Р»Р° RSSI РІ РїСЂРёРЅСЏС‚РѕРј РїР°РєРµС‚Рµ
+	s32 FreqError; // РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕРµ СЃРјРµС‰РµРЅРёРµ РїРѕ С‡Р°СЃС‚РѕС‚Рµ РїСЂРёРЅСЏС‚РѕРіРѕ РїР°РєРµС‚Р°
+	s8 SNR;		   // СЃРѕРѕС‚РЅРѕС€РµРЅРёРµ СЃРёРіРЅР°Р»/С€СѓРј РґР»СЏ РїСЂРёРЅСЏС‚РѕРіРѕ РїР°РєРµС‚Р°
+	s8 Power;	   // РјРѕС‰РЅРѕСЃС‚СЊ РёР·Р»СѓС‡РµРЅРёСЏ РїРµСЂРµРґР°С‚С‡РёРєР°, РїРµСЂРµРґР°РµС‚СЃСЏ РІ РїР°РєРµС‚Рµ
+	u8 CounterTxP; // СЃС‡РµС‚С‡РёРє РїРµСЂРµРґР°РЅРЅС‹С… РїР°РєРµС‚РѕРІ. Р’СЂРµРјРµРЅРЅРѕ todo
+} LoraRXstruct;
 
-LoraRXstruct LoraRX [10]; 	// массив структур параметров приема от каждого из маяков
-s16 LoraRssiMax = -130	;	// максимальный уровень сигнала из принятых пакетов, для индикатора
-u16 counterMaxRssiReset ;	// счетчик для периодического сброса максимального уровня RSSI
-u16 counterRssiReset [10];	// массив счетчиков для всех маяков, для сброса уровня RSSI по времени
+LoraRXstruct LoraRX[10];  // РјР°СЃСЃРёРІ СЃС‚СЂСѓРєС‚СѓСЂ РїР°СЂР°РјРµС‚СЂРѕРІ РїСЂРёРµРјР° РѕС‚ РєР°Р¶РґРѕРіРѕ РёР· РјР°СЏРєРѕРІ
+s16 LoraRssiMax = -130;	  // РјР°РєСЃРёРјР°Р»СЊРЅС‹Р№ СѓСЂРѕРІРµРЅСЊ СЃРёРіРЅР°Р»Р° РёР· РїСЂРёРЅСЏС‚С‹С… РїР°РєРµС‚РѕРІ, РґР»СЏ РёРЅРґРёРєР°С‚РѕСЂР°
+u16 counterMaxRssiReset;  // СЃС‡РµС‚С‡РёРє РґР»СЏ РїРµСЂРёРѕРґРёС‡РµСЃРєРѕРіРѕ СЃР±СЂРѕСЃР° РјР°РєСЃРёРјР°Р»СЊРЅРѕРіРѕ СѓСЂРѕРІРЅСЏ RSSI
+u16 counterRssiReset[10]; // РјР°СЃСЃРёРІ СЃС‡РµС‚С‡РёРєРѕРІ РґР»СЏ РІСЃРµС… РјР°СЏРєРѕРІ, РґР»СЏ СЃР±СЂРѕСЃР° СѓСЂРѕРІРЅСЏ RSSI РїРѕ РІСЂРµРјРµРЅРё
 
-u8 NumberTransmitted;		// номер маяка, от которого принята посылка
-s8 RFPowerTransmitted;  	// мощность передатчика, от которого принята посылка
+u8 NumberTransmitted;  // РЅРѕРјРµСЂ РјР°СЏРєР°, РѕС‚ РєРѕС‚РѕСЂРѕРіРѕ РїСЂРёРЅСЏС‚Р° РїРѕСЃС‹Р»РєР°
+s8 RFPowerTransmitted; // РјРѕС‰РЅРѕСЃС‚СЊ РїРµСЂРµРґР°С‚С‡РёРєР°, РѕС‚ РєРѕС‚РѕСЂРѕРіРѕ РїСЂРёРЅСЏС‚Р° РїРѕСЃС‹Р»РєР°
 
-u32	TimeSecFirstRX [10];	// массив времен когда от данного маяка был принят сигнал в первый раз. Для вычисления PER
-u16 CountRX	[10];			// счетчики принятых посылок от маяков. Для вычисления PER
-u16 PER [10];				// массив измерненых PER для каждого маяка
+u32 TimeSecFirstRX[10]; // РјР°СЃСЃРёРІ РІСЂРµРјРµРЅ РєРѕРіРґР° РѕС‚ РґР°РЅРЅРѕРіРѕ РјР°СЏРєР° Р±С‹Р» РїСЂРёРЅСЏС‚ СЃРёРіРЅР°Р» РІ РїРµСЂРІС‹Р№ СЂР°Р·. Р”Р»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ PER
+u16 CountRX[10];		// СЃС‡РµС‚С‡РёРєРё РїСЂРёРЅСЏС‚С‹С… РїРѕСЃС‹Р»РѕРє РѕС‚ РјР°СЏРєРѕРІ. Р”Р»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ PER
+u16 PER[10];			// РјР°СЃСЃРёРІ РёР·РјРµСЂРЅРµРЅС‹С… PER РґР»СЏ РєР°Р¶РґРѕРіРѕ РјР°СЏРєР°
 
-//u16 timeDelta; // временно
-#pragma pack (push, 1) 		// помещаем текущее значение выравнивания упаковки во внутренний стек компилятора, текущее выравнивание = 1 байт
+// u16 timeDelta; // РІСЂРµРјРµРЅРЅРѕ
+#pragma pack(push, 1) // РїРѕРјРµС‰Р°РµРј С‚РµРєСѓС‰РµРµ Р·РЅР°С‡РµРЅРёРµ РІС‹СЂР°РІРЅРёРІР°РЅРёСЏ СѓРїР°РєРѕРІРєРё РІРѕ РІРЅСѓС‚СЂРµРЅРЅРёР№ СЃС‚РµРє РєРѕРјРїРёР»СЏС‚РѕСЂР°, С‚РµРєСѓС‰РµРµ РІС‹СЂР°РІРЅРёРІР°РЅРёРµ = 1 Р±Р°Р№С‚
 
-typedef struct datastruct_t // структура данных одного маяка
-{	// 6 32-разрядных слов, 24 байт
-	u8	Number;			// номер маяка и мощность принятого сигнала (+ флаги)
-	u8  NS_EW;			// с-ю / в-з
-	u16 Vacc;			// напряжение аккумулятора
-	u32 TimeSec;		// текущее время UTC
-	u32 Longitude;		// Долгота
-	u32 Latitude;		// широта
-	u32 Altitude;		// высота
-	u32 reserv;			// резерв  (NO FIX, 2D, 3D)
-}DATASTRUCT;  			// Определяем новый тип переменных и саму структуру
+typedef struct datastruct_t // СЃС‚СЂСѓРєС‚СѓСЂР° РґР°РЅРЅС‹С… РѕРґРЅРѕРіРѕ РјР°СЏРєР°
+{							// 6 32-СЂР°Р·СЂСЏРґРЅС‹С… СЃР»РѕРІ, 24 Р±Р°Р№С‚
+	u8 Number;				// РЅРѕРјРµСЂ РјР°СЏРєР° Рё РјРѕС‰РЅРѕСЃС‚СЊ РїСЂРёРЅСЏС‚РѕРіРѕ СЃРёРіРЅР°Р»Р° (+ С„Р»Р°РіРё)
+	u8 NS_EW;				// СЃ-СЋ / РІ-Р·
+	u16 Vacc;				// РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°
+	u32 TimeSec;			// С‚РµРєСѓС‰РµРµ РІСЂРµРјСЏ UTC
+	u32 Longitude;			// Р”РѕР»РіРѕС‚Р°
+	u32 Latitude;			// С€РёСЂРѕС‚Р°
+	u32 Altitude;			// РІС‹СЃРѕС‚Р°
+	u32 reserv;				// СЂРµР·РµСЂРІ  (NO FIX, 2D, 3D)
+} DATASTRUCT;				// РћРїСЂРµРґРµР»СЏРµРј РЅРѕРІС‹Р№ С‚РёРї РїРµСЂРµРјРµРЅРЅС‹С… Рё СЃР°РјСѓ СЃС‚СЂСѓРєС‚СѓСЂСѓ
 
-#pragma pack (pop)			// удаляем запись из вершины внутреннего стека компилятора
-
+#pragma pack(pop) // СѓРґР°Р»СЏРµРј Р·Р°РїРёСЃСЊ РёР· РІРµСЂС€РёРЅС‹ РІРЅСѓС‚СЂРµРЅРЅРµРіРѕ СЃС‚РµРєР° РєРѕРјРїРёР»СЏС‚РѕСЂР°
 
 // DATASTRUCT TX_str ;
 
-//DATASTRUCT  TX_Packet [10] ; 	//
+// DATASTRUCT  TX_Packet [10] ; 	//
 
-// приемная сторона
-// новый массив из 10-ти структур типа DATASTRUCT
-DATASTRUCT structBuffer [10];
+// РїСЂРёРµРјРЅР°СЏ СЃС‚РѕСЂРѕРЅР°
+// РЅРѕРІС‹Р№ РјР°СЃСЃРёРІ РёР· 10-С‚Рё СЃС‚СЂСѓРєС‚СѓСЂ С‚РёРїР° DATASTRUCT
+DATASTRUCT structBuffer[10];
 
-u32 TimeNew	;				// новое время посылки от каждого из маяков
-u32 TimesOld	[10];		// массив старых времен посылок от каждого из маяков
+u32 TimeNew;	  // РЅРѕРІРѕРµ РІСЂРµРјСЏ РїРѕСЃС‹Р»РєРё РѕС‚ РєР°Р¶РґРѕРіРѕ РёР· РјР°СЏРєРѕРІ
+u32 TimesOld[10]; // РјР°СЃСЃРёРІ СЃС‚Р°СЂС‹С… РІСЂРµРјРµРЅ РїРѕСЃС‹Р»РѕРє РѕС‚ РєР°Р¶РґРѕРіРѕ РёР· РјР°СЏРєРѕРІ
 
-// где-то в инициализации:
-//char *inBuffer = (char*)structBuffer; // указатель на переменную типа char. structBuffer также приводится к этому типу
-// записав поток данных в inBuffer [] получим заполненный массив структур типа DATASTRUCT (?)
+// РіРґРµ-С‚Рѕ РІ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё:
+// char *inBuffer = (char*)structBuffer; // СѓРєР°Р·Р°С‚РµР»СЊ РЅР° РїРµСЂРµРјРµРЅРЅСѓСЋ С‚РёРїР° char. structBuffer С‚Р°РєР¶Рµ РїСЂРёРІРѕРґРёС‚СЃСЏ Рє СЌС‚РѕРјСѓ С‚РёРїСѓ
+// Р·Р°РїРёСЃР°РІ РїРѕС‚РѕРє РґР°РЅРЅС‹С… РІ inBuffer [] РїРѕР»СѓС‡РёРј Р·Р°РїРѕР»РЅРµРЅРЅС‹Р№ РјР°СЃСЃРёРІ СЃС‚СЂСѓРєС‚СѓСЂ С‚РёРїР° DATASTRUCT (?)
 
-//------------------------------ переменные ADC --------------------------------------
+//------------------------------ РїРµСЂРµРјРµРЅРЅС‹Рµ ADC --------------------------------------
 u16 adc1, adc2, adcIntRef;
-u32 Vacc1, Vbat1, Vref1, VaccSumm, VbatSumm, VrefSumm; 	// текущее напряжение аккумулятора и батарейки, в мВ
-#define Average1	1000									// размер массивов для усреднения измеренных напряжений
-u16 Vacc [Average1];									// массивы для усреднения скользящим средним
-//u16 Vbat [Average1];
-u16 Vref [Average1];
-u16 VaccAvg, VrefAvg;			// усредненные значения
-s8 VrefDev, VaccDev;			// отклонение от номинального значения, в %
-bool ChargeTrigger; 			// триггер заряда аккумулятора, для индикации
+u32 Vacc1, Vbat1, Vref1, VaccSumm, VbatSumm, VrefSumm; // С‚РµРєСѓС‰РµРµ РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° Рё Р±Р°С‚Р°СЂРµР№РєРё, РІ РјР’
+#define Average1 1000								   // СЂР°Р·РјРµСЂ РјР°СЃСЃРёРІРѕРІ РґР»СЏ СѓСЃСЂРµРґРЅРµРЅРёСЏ РёР·РјРµСЂРµРЅРЅС‹С… РЅР°РїСЂСЏР¶РµРЅРёР№
+u16 Vacc[Average1];									   // РјР°СЃСЃРёРІС‹ РґР»СЏ СѓСЃСЂРµРґРЅРµРЅРёСЏ СЃРєРѕР»СЊР·СЏС‰РёРј СЃСЂРµРґРЅРёРј
+// u16 Vbat [Average1];
+u16 Vref[Average1];
+u16 VaccAvg, VrefAvg; // СѓСЃСЂРµРґРЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ
+s8 VrefDev, VaccDev;  // РѕС‚РєР»РѕРЅРµРЅРёРµ РѕС‚ РЅРѕРјРёРЅР°Р»СЊРЅРѕРіРѕ Р·РЅР°С‡РµРЅРёСЏ, РІ %
+bool ChargeTrigger;	  // С‚СЂРёРіРіРµСЂ Р·Р°СЂСЏРґР° Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°, РґР»СЏ РёРЅРґРёРєР°С†РёРё
 
-u8 VaccLog [128]; 		// данные напряжения аккумулятора для графика
-u8 counterVaccLog; 		// счетчик текущего отсчета в логе
-u32 TimeStartLogVcc; 	// время начала записи в лог
-u32 TimeLogVcc; 		// длительность записи в лог
-bool triggerTimeStartLogVcc ; // триггер для определения времени начала записи лога
-u8 counterVaccosc;		// счетчик для осциллограммы мгновенного напряжения
-s8 VaccOsc [100];		// массив для осциллограммы мгновенного напряжения
-//----------------------- кнопки, экран ----------------------------------------------
-bool trigger1, trigger2;				// триггеры однократного нажатия кнопок
-u8	screen = 1;							// номер экрана для отображения
-#define  PowerOffTimeout 100			// таймаут для длительного нажатия кнопки SCREEN
-u16	counterPowerOff = PowerOffTimeout; 	// счетчик задержки выключения питания кнопкой
-u32 counterLcdOff = LcdOffTimeout;		// счетчик задержки выключения дисплея, мс
+u8 VaccLog[128];			 // РґР°РЅРЅС‹Рµ РЅР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РґР»СЏ РіСЂР°С„РёРєР°
+u8 counterVaccLog;			 // СЃС‡РµС‚С‡РёРє С‚РµРєСѓС‰РµРіРѕ РѕС‚СЃС‡РµС‚Р° РІ Р»РѕРіРµ
+u32 TimeStartLogVcc;		 // РІСЂРµРјСЏ РЅР°С‡Р°Р»Р° Р·Р°РїРёСЃРё РІ Р»РѕРі
+u32 TimeLogVcc;				 // РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ Р·Р°РїРёСЃРё РІ Р»РѕРі
+bool triggerTimeStartLogVcc; // С‚СЂРёРіРіРµСЂ РґР»СЏ РѕРїСЂРµРґРµР»РµРЅРёСЏ РІСЂРµРјРµРЅРё РЅР°С‡Р°Р»Р° Р·Р°РїРёСЃРё Р»РѕРіР°
+u8 counterVaccosc;			 // СЃС‡РµС‚С‡РёРє РґР»СЏ РѕСЃС†РёР»Р»РѕРіСЂР°РјРјС‹ РјРіРЅРѕРІРµРЅРЅРѕРіРѕ РЅР°РїСЂСЏР¶РµРЅРёСЏ
+s8 VaccOsc[100];			 // РјР°СЃСЃРёРІ РґР»СЏ РѕСЃС†РёР»Р»РѕРіСЂР°РјРјС‹ РјРіРЅРѕРІРµРЅРЅРѕРіРѕ РЅР°РїСЂСЏР¶РµРЅРёСЏ
+//----------------------- РєРЅРѕРїРєРё, СЌРєСЂР°РЅ ----------------------------------------------
+bool trigger1, trigger2;			   // С‚СЂРёРіРіРµСЂС‹ РѕРґРЅРѕРєСЂР°С‚РЅРѕРіРѕ РЅР°Р¶Р°С‚РёСЏ РєРЅРѕРїРѕРє
+u8 screen = 1;						   // РЅРѕРјРµСЂ СЌРєСЂР°РЅР° РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ
+#define PowerOffTimeout 100			   // С‚Р°Р№РјР°СѓС‚ РґР»СЏ РґР»РёС‚РµР»СЊРЅРѕРіРѕ РЅР°Р¶Р°С‚РёСЏ РєРЅРѕРїРєРё SCREEN
+u16 counterPowerOff = PowerOffTimeout; // СЃС‡РµС‚С‡РёРє Р·Р°РґРµСЂР¶РєРё РІС‹РєР»СЋС‡РµРЅРёСЏ РїРёС‚Р°РЅРёСЏ РєРЅРѕРїРєРѕР№
+u32 counterLcdOff = LcdOffTimeout;	   // СЃС‡РµС‚С‡РёРє Р·Р°РґРµСЂР¶РєРё РІС‹РєР»СЋС‡РµРЅРёСЏ РґРёСЃРїР»РµСЏ, РјСЃ
 
-//------------------ таймер, измерение периода 1PPS ------------------------------
-#define  AVG_TIM4 			30 			// усреднять 1PPS по 30 значениям
+//------------------ С‚Р°Р№РјРµСЂ, РёР·РјРµСЂРµРЅРёРµ РїРµСЂРёРѕРґР° 1PPS ------------------------------
+#define AVG_TIM4 30 // СѓСЃСЂРµРґРЅСЏС‚СЊ 1PPS РїРѕ 30 Р·РЅР°С‡РµРЅРёСЏРј
 
-volatile u8 counter_TIM4_OVR; 			// счетчик переполнений таймера 4
-volatile u8 counter_TIM1_OVR; 			// счетчик переполнений таймера 1
-volatile u8 counter_TIM4_fix;			// значение счетчика циклов таймера на момент прихода прерывания 1PPS
-volatile u16 TIM4_fix;					// значение таймера в момент прихода прерывания 1PPS
-volatile bool flag_1PPS_Update;  		// флаг обновления значения периода 1PPS
-volatile bool flag_1PPS_timeout;		// 1PPS отсутствует
-u16 averageTIM4 [AVG_TIM4];				// массив для усреднения значения периода 1PPS
-u16 averageTIM4_temp;					// усредненное значение таймера 1PPS
-u16 averageTIM4_ready = 37200;			// усредненное значение таймера 1PPS после 35 усреднений
-volatile bool flag_1PPS_fail;			// флаг ошибки измерения периода 1PPS, период слишком маленький или большой
-volatile bool flag_1PPS_AVG_OK = 0;		// флаг готовности результатов усреднения 1PPS
-volatile bool flag_sync_stop = 0;		// временный флаг для измерений ухода частоты таймера
-volatile u8 counter_AVG_1PPS = 0;		// счетчик усреднений 1PPS
-u8 i_avg = 0; 							// счетчик усреднений
-u32 summ = 0;							// сумма для усреднения
-volatile bool flag_1PPS_pulse;			// флаг устанавливается в прерывании от 1PPS или от таймера 1
+volatile u8 counter_TIM4_OVR;		// СЃС‡РµС‚С‡РёРє РїРµСЂРµРїРѕР»РЅРµРЅРёР№ С‚Р°Р№РјРµСЂР° 4
+volatile u8 counter_TIM1_OVR;		// СЃС‡РµС‚С‡РёРє РїРµСЂРµРїРѕР»РЅРµРЅРёР№ С‚Р°Р№РјРµСЂР° 1
+volatile u8 counter_TIM4_fix;		// Р·РЅР°С‡РµРЅРёРµ СЃС‡РµС‚С‡РёРєР° С†РёРєР»РѕРІ С‚Р°Р№РјРµСЂР° РЅР° РјРѕРјРµРЅС‚ РїСЂРёС…РѕРґР° РїСЂРµСЂС‹РІР°РЅРёСЏ 1PPS
+volatile u16 TIM4_fix;				// Р·РЅР°С‡РµРЅРёРµ С‚Р°Р№РјРµСЂР° РІ РјРѕРјРµРЅС‚ РїСЂРёС…РѕРґР° РїСЂРµСЂС‹РІР°РЅРёСЏ 1PPS
+volatile bool flag_1PPS_Update;		// С„Р»Р°Рі РѕР±РЅРѕРІР»РµРЅРёСЏ Р·РЅР°С‡РµРЅРёСЏ РїРµСЂРёРѕРґР° 1PPS
+volatile bool flag_1PPS_timeout;	// 1PPS РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚
+u16 averageTIM4[AVG_TIM4];			// РјР°СЃСЃРёРІ РґР»СЏ СѓСЃСЂРµРґРЅРµРЅРёСЏ Р·РЅР°С‡РµРЅРёСЏ РїРµСЂРёРѕРґР° 1PPS
+u16 averageTIM4_temp;				// СѓСЃСЂРµРґРЅРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ С‚Р°Р№РјРµСЂР° 1PPS
+u16 averageTIM4_ready = 37200;		// СѓСЃСЂРµРґРЅРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ С‚Р°Р№РјРµСЂР° 1PPS РїРѕСЃР»Рµ 35 СѓСЃСЂРµРґРЅРµРЅРёР№
+volatile bool flag_1PPS_fail;		// С„Р»Р°Рі РѕС€РёР±РєРё РёР·РјРµСЂРµРЅРёСЏ РїРµСЂРёРѕРґР° 1PPS, РїРµСЂРёРѕРґ СЃР»РёС€РєРѕРј РјР°Р»РµРЅСЊРєРёР№ РёР»Рё Р±РѕР»СЊС€РѕР№
+volatile bool flag_1PPS_AVG_OK = 0; // С„Р»Р°Рі РіРѕС‚РѕРІРЅРѕСЃС‚Рё СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ СѓСЃСЂРµРґРЅРµРЅРёСЏ 1PPS
+volatile bool flag_sync_stop = 0;	// РІСЂРµРјРµРЅРЅС‹Р№ С„Р»Р°Рі РґР»СЏ РёР·РјРµСЂРµРЅРёР№ СѓС…РѕРґР° С‡Р°СЃС‚РѕС‚С‹ С‚Р°Р№РјРµСЂР°
+volatile u8 counter_AVG_1PPS = 0;	// СЃС‡РµС‚С‡РёРє СѓСЃСЂРµРґРЅРµРЅРёР№ 1PPS
+u8 i_avg = 0;						// СЃС‡РµС‚С‡РёРє СѓСЃСЂРµРґРЅРµРЅРёР№
+u32 summ = 0;						// СЃСѓРјРјР° РґР»СЏ СѓСЃСЂРµРґРЅРµРЅРёСЏ
+volatile bool flag_1PPS_pulse;		// С„Р»Р°Рі СѓСЃС‚Р°РЅР°РІР»РёРІР°РµС‚СЃСЏ РІ РїСЂРµСЂС‹РІР°РЅРёРё РѕС‚ 1PPS РёР»Рё РѕС‚ С‚Р°Р№РјРµСЂР° 1
 
-u32 sec_div;							// остаток от деления секунд текущих суток на 60
+u32 sec_div; // РѕСЃС‚Р°С‚РѕРє РѕС‚ РґРµР»РµРЅРёСЏ СЃРµРєСѓРЅРґ С‚РµРєСѓС‰РёС… СЃСѓС‚РѕРє РЅР° 60
 
-double distance1_1_2, distance1_1_3, distance1_2_3;		// расстояние между маяками
-double distance2_1_2, distance2_1_3, distance2_2_3;		// расстояние между маяками
-double latt_1, latt_2, latt_3, latt_4;  // широты  маяков в градусах
-double long_1, long_2, long_3, long_4; 	// долготы двух маяков в градусах
+double distance1_1_2, distance1_1_3, distance1_2_3; // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ РјР°СЏРєР°РјРё
+double distance2_1_2, distance2_1_3, distance2_2_3; // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ РјР°СЏРєР°РјРё
+double latt_1, latt_2, latt_3, latt_4;				// С€РёСЂРѕС‚С‹  РјР°СЏРєРѕРІ РІ РіСЂР°РґСѓСЃР°С…
+double long_1, long_2, long_3, long_4;				// РґРѕР»РіРѕС‚С‹ РґРІСѓС… РјР°СЏРєРѕРІ РІ РіСЂР°РґСѓСЃР°С…
 double grad, rad;
 
-
-
-// переменные I2C1
-__IO uint8_t Tx_Idx1=0 ;
+// РїРµСЂРµРјРµРЅРЅС‹Рµ I2C1
+__IO uint8_t Tx_Idx1 = 0;
 extern __IO uint32_t NumbOfBytes1;
 extern uint8_t Buffer_Tx1[];
 extern uint8_t Address;
 
-#define DebugMode	0		// Расширеный список экранов
-#define ReleaseMode	1		// Сокращенный список экранов
-u8 ScreenMode = DebugMode;	// Режим вывода информации на экран - полный список или сокращенный
-u8 CounterTxPacket;			// Счетчик переданных в эфир пакетов. Для контроля прохождения пакетов по сети, временно
+#define DebugMode 0		   // Р Р°СЃС€РёСЂРµРЅС‹Р№ СЃРїРёСЃРѕРє СЌРєСЂР°РЅРѕРІ
+#define ReleaseMode 1	   // РЎРѕРєСЂР°С‰РµРЅРЅС‹Р№ СЃРїРёСЃРѕРє СЌРєСЂР°РЅРѕРІ
+u8 ScreenMode = DebugMode; // Р РµР¶РёРј РІС‹РІРѕРґР° РёРЅС„РѕСЂРјР°С†РёРё РЅР° СЌРєСЂР°РЅ - РїРѕР»РЅС‹Р№ СЃРїРёСЃРѕРє РёР»Рё СЃРѕРєСЂР°С‰РµРЅРЅС‹Р№
+u8 CounterTxPacket;		   // РЎС‡РµС‚С‡РёРє РїРµСЂРµРґР°РЅРЅС‹С… РІ СЌС„РёСЂ РїР°РєРµС‚РѕРІ. Р”Р»СЏ РєРѕРЅС‚СЂРѕР»СЏ РїСЂРѕС…РѕР¶РґРµРЅРёСЏ РїР°РєРµС‚РѕРІ РїРѕ СЃРµС‚Рё, РІСЂРµРјРµРЅРЅРѕ
 
 //--------------------------------- MAIN -----------------------------------------------------------------------------------------------------------------------------
-int  main(void)
+int main(void)
 {
-	init(); 				// инициализация контроллера, периферии, внешних модулей
+	init(); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РєРѕРЅС‚СЂРѕР»Р»РµСЂР°, РїРµСЂРёС„РµСЂРёРё, РІРЅРµС€РЅРёС… РјРѕРґСѓР»РµР№
 
-	Radio -> StartRx();		// включение трансивера на прием
-//============================================================================================
-	for (;;) 	// бесконечный цикл
+	Radio->StartRx(); // РІРєР»СЋС‡РµРЅРёРµ С‚СЂР°РЅСЃРёРІРµСЂР° РЅР° РїСЂРёРµРј
+					  //============================================================================================
+	for (;;)		  // Р±РµСЃРєРѕРЅРµС‡РЅС‹Р№ С†РёРєР»
 	{
-		
-		Measurement1PPS (); 	// Измерение периода сигнала 1PPS
-	
-		Average1PPS ();			// Усреднение
 
-		ReceiveGPS(); 			// Проверка приема посылки от GPS и парсинг
+		Measurement1PPS(); // РР·РјРµСЂРµРЅРёРµ РїРµСЂРёРѕРґР° СЃРёРіРЅР°Р»Р° 1PPS
 
+		Average1PPS(); // РЈСЃСЂРµРґРЅРµРЅРёРµ
 
+		ReceiveGPS(); // РџСЂРѕРІРµСЂРєР° РїСЂРёРµРјР° РїРѕСЃС‹Р»РєРё РѕС‚ GPS Рё РїР°СЂСЃРёРЅРі
 
-// -- вычисление расстояния между маяками  ----------- 55°10.7014  55107014     61°24.0958  6124058
+		// -- РІС‹С‡РёСЃР»РµРЅРёРµ СЂР°СЃСЃС‚РѕСЏРЅРёСЏ РјРµР¶РґСѓ РјР°СЏРєР°РјРё  ----------- 55В°10.7014  55107014     61В°24.0958  6124058
 
-//		structBuffer[1].Latitude = 55450000 ;
-//		structBuffer[1].Longitude = 61370000 ;
-//
-//		structBuffer[2].Latitude = 55460000 ;
-//		structBuffer[2].Longitude = 61380000 ;
+		//		structBuffer[1].Latitude = 55450000 ;
+		//		structBuffer[1].Longitude = 61370000 ;
+		//
+		//		structBuffer[2].Latitude = 55460000 ;
+		//		structBuffer[2].Longitude = 61380000 ;
 
-//latt_2 = ( ( (GPSLatitude / 1000000) + ( (GPSLatitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
-//long_2 = ( ( (GPSLongitude / 1000000) + ( (GPSLongitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
+		// latt_2 = ( ( (GPSLatitude / 1000000) + ( (GPSLatitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+		// long_2 = ( ( (GPSLongitude / 1000000) + ( (GPSLongitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
 
-		latt_1 = ( ( (structBuffer[1].Latitude / 1000000) + ( (structBuffer[1].Latitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
-		latt_2 = ( ( (structBuffer[2].Latitude / 1000000) + ( (structBuffer[2].Latitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
-		latt_3 = ( ( (structBuffer[3].Latitude / 1000000) + ( (structBuffer[3].Latitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
-		latt_4 = ( ( (structBuffer[4].Latitude / 1000000) + ( (structBuffer[4].Latitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
-		//rad = (grad * M_PI) / 180;							// координата в радианах
+		latt_1 = (((structBuffer[1].Latitude / 1000000) + ((structBuffer[1].Latitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180; // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+		latt_2 = (((structBuffer[2].Latitude / 1000000) + ((structBuffer[2].Latitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180; // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+		latt_3 = (((structBuffer[3].Latitude / 1000000) + ((structBuffer[3].Latitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180; // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+		latt_4 = (((structBuffer[4].Latitude / 1000000) + ((structBuffer[4].Latitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180; // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+		// rad = (grad * M_PI) / 180;							// РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
 
-		long_1 = ( ( (structBuffer[1].Longitude / 1000000) + ( (structBuffer[1].Longitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
-		long_2 = ( ( (structBuffer[2].Longitude / 1000000) + ( (structBuffer[2].Longitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
-		long_3 = ( ( (structBuffer[3].Longitude / 1000000) + ( (structBuffer[3].Longitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
-		long_4 = ( ( (structBuffer[4].Longitude / 1000000) + ( (structBuffer[4].Longitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;		// координата в радианах
+		long_1 = (((structBuffer[1].Longitude / 1000000) + ((structBuffer[1].Longitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180; // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+		long_2 = (((structBuffer[2].Longitude / 1000000) + ((structBuffer[2].Longitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180; // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+		long_3 = (((structBuffer[3].Longitude / 1000000) + ((structBuffer[3].Longitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180; // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+		long_4 = (((structBuffer[4].Longitude / 1000000) + ((structBuffer[4].Longitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180; // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
 
-		//distance1 = sin( latt_2 );
+		// distance1 = sin( latt_2 );
 
+		distance1_1_2 = 6372795 * acos(sin(latt_1) * sin(latt_2) + cos(latt_1) * cos(latt_2) * cos(long_1 - long_2)); // Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ 1 Рё 2 РјР°СЏРєР°РјРё. РђСЂРіСѓРјРµРЅС‚С‹ sin РІ СЂР°РґРёР°РЅР°С… . Р—РЅР°С‡РµРЅРёРµ РІ РјРµС‚СЂР°С…
+		distance1_2_3 = 6372795 * acos(sin(latt_2) * sin(latt_3) + cos(latt_2) * cos(latt_3) * cos(long_2 - long_3)); // Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ 2 Рё 3 РјР°СЏРєР°РјРё. РђСЂРіСѓРјРµРЅС‚С‹ sin РІ СЂР°РґРёР°РЅР°С… . Р—РЅР°С‡РµРЅРёРµ РІ РјРµС‚СЂР°С…
+		distance1_1_3 = 6372795 * acos(sin(latt_1) * sin(latt_3) + cos(latt_1) * cos(latt_3) * cos(long_1 - long_3)); // Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ 1 Рё 3 РјР°СЏРєР°РјРё. РђСЂРіСѓРјРµРЅС‚С‹ sin РІ СЂР°РґРёР°РЅР°С… . Р—РЅР°С‡РµРЅРёРµ РІ РјРµС‚СЂР°С…
 
-		distance1_1_2 = 6372795 * acos ( sin (latt_1) * sin (latt_2) +cos (latt_1) * cos (latt_2) * cos (long_1 - long_2) )  ; // Расстояние между 1 и 2 маяками. Аргументы sin в радианах . Значение в метрах
-		distance1_2_3 = 6372795 * acos ( sin (latt_2) * sin (latt_3) +cos (latt_2) * cos (latt_3) * cos (long_2 - long_3) )  ; // Расстояние между 2 и 3 маяками. Аргументы sin в радианах . Значение в метрах
-		distance1_1_3 = 6372795 * acos ( sin (latt_1) * sin (latt_3) +cos (latt_1) * cos (latt_3) * cos (long_1 - long_3) )  ; // Расстояние между 1 и 3 маяками. Аргументы sin в радианах . Значение в метрах
-
-
-
-		if ( LORA_TX_TIME == 1)  // если этот маяк - №1
+		if (LORA_TX_TIME == 1) // РµСЃР»Рё СЌС‚РѕС‚ РјР°СЏРє - в„–1
 		{
-			latt_1 = ( ( (GPSLatitude / 1000000) + ( (GPSLatitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;				// координата текущего местоположения в радианах
-			long_1 = ( ( (GPSLongitude / 1000000) + ( (GPSLongitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;			// координата в радианах
-			distance2_1_2 = 6372795 * acos ( sin (latt_1) * sin (latt_2) +cos (latt_1) * cos (latt_2) * cos (long_1 - long_2) )  ; 	// Расстояние между текущим местоположением и последним принятым от другого маяка. Аргументы sin в радианах . Значение в метрах
-			distance2_1_3 = 6372795 * acos ( sin (latt_1) * sin (latt_3) +cos (latt_1) * cos (latt_3) * cos (long_1 - long_3) )  ; 	// Расстояние между текущим местоположением и последним принятым от другого маяка. Аргументы sin в радианах . Значение в метрах
+			latt_1 = (((GPSLatitude / 1000000) + ((GPSLatitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180;				  // РєРѕРѕСЂРґРёРЅР°С‚Р° С‚РµРєСѓС‰РµРіРѕ РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёСЏ РІ СЂР°РґРёР°РЅР°С…
+			long_1 = (((GPSLongitude / 1000000) + ((GPSLongitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180;			  // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+			distance2_1_2 = 6372795 * acos(sin(latt_1) * sin(latt_2) + cos(latt_1) * cos(latt_2) * cos(long_1 - long_2)); // Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ С‚РµРєСѓС‰РёРј РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёРµРј Рё РїРѕСЃР»РµРґРЅРёРј РїСЂРёРЅСЏС‚С‹Рј РѕС‚ РґСЂСѓРіРѕРіРѕ РјР°СЏРєР°. РђСЂРіСѓРјРµРЅС‚С‹ sin РІ СЂР°РґРёР°РЅР°С… . Р—РЅР°С‡РµРЅРёРµ РІ РјРµС‚СЂР°С…
+			distance2_1_3 = 6372795 * acos(sin(latt_1) * sin(latt_3) + cos(latt_1) * cos(latt_3) * cos(long_1 - long_3)); // Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ С‚РµРєСѓС‰РёРј РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёРµРј Рё РїРѕСЃР»РµРґРЅРёРј РїСЂРёРЅСЏС‚С‹Рј РѕС‚ РґСЂСѓРіРѕРіРѕ РјР°СЏРєР°. РђСЂРіСѓРјРµРЅС‚С‹ sin РІ СЂР°РґРёР°РЅР°С… . Р—РЅР°С‡РµРЅРёРµ РІ РјРµС‚СЂР°С…
 		}
 
-		if ( LORA_TX_TIME == 2)  // если этот маяк - №2
+		if (LORA_TX_TIME == 2) // РµСЃР»Рё СЌС‚РѕС‚ РјР°СЏРє - в„–2
 		{
-			latt_2 = ( ( (GPSLatitude / 1000000) + ( (GPSLatitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;				// координата текущего местоположения в радианах
-			long_2 = ( ( (GPSLongitude / 1000000) + ( (GPSLongitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;			// координата в радианах
-			distance2_1_2 = 6372795 * acos ( sin (latt_1) * sin (latt_2) +cos (latt_1) * cos (latt_2) * cos (long_1 - long_2) )  ; 	// Расстояние между текущим местоположением и последним принятым от другого маяка. Аргументы sin в радианах . Значение в метрах
-			distance2_2_3 = 6372795 * acos ( sin (latt_2) * sin (latt_3) +cos (latt_2) * cos (latt_3) * cos (long_2 - long_3) )  ; 	// Расстояние между текущим местоположением и последним принятым от другого маяка. Аргументы sin в радианах . Значение в метрах
+			latt_2 = (((GPSLatitude / 1000000) + ((GPSLatitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180;				  // РєРѕРѕСЂРґРёРЅР°С‚Р° С‚РµРєСѓС‰РµРіРѕ РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёСЏ РІ СЂР°РґРёР°РЅР°С…
+			long_2 = (((GPSLongitude / 1000000) + ((GPSLongitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180;			  // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+			distance2_1_2 = 6372795 * acos(sin(latt_1) * sin(latt_2) + cos(latt_1) * cos(latt_2) * cos(long_1 - long_2)); // Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ С‚РµРєСѓС‰РёРј РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёРµРј Рё РїРѕСЃР»РµРґРЅРёРј РїСЂРёРЅСЏС‚С‹Рј РѕС‚ РґСЂСѓРіРѕРіРѕ РјР°СЏРєР°. РђСЂРіСѓРјРµРЅС‚С‹ sin РІ СЂР°РґРёР°РЅР°С… . Р—РЅР°С‡РµРЅРёРµ РІ РјРµС‚СЂР°С…
+			distance2_2_3 = 6372795 * acos(sin(latt_2) * sin(latt_3) + cos(latt_2) * cos(latt_3) * cos(long_2 - long_3)); // Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ С‚РµРєСѓС‰РёРј РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёРµРј Рё РїРѕСЃР»РµРґРЅРёРј РїСЂРёРЅСЏС‚С‹Рј РѕС‚ РґСЂСѓРіРѕРіРѕ РјР°СЏРєР°. РђСЂРіСѓРјРµРЅС‚С‹ sin РІ СЂР°РґРёР°РЅР°С… . Р—РЅР°С‡РµРЅРёРµ РІ РјРµС‚СЂР°С…
 		}
 
-		if ( LORA_TX_TIME == 3)  // если этот маяк - №3
+		if (LORA_TX_TIME == 3) // РµСЃР»Рё СЌС‚РѕС‚ РјР°СЏРє - в„–3
 		{
-			latt_3 = ( ( (GPSLatitude / 1000000) + ( (GPSLatitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;				// координата текущего местоположения в радианах
-			long_3 = ( ( (GPSLongitude / 1000000) + ( (GPSLongitude % 1000000) / 10000.0 ) / 60.0 ) * M_PI ) / 180 ;			// координата в радианах
-			distance2_1_3 = 6372795 * acos ( sin (latt_1) * sin (latt_3) +cos (latt_1) * cos (latt_3) * cos (long_1 - long_3) )  ; 	// Расстояние между текущим местоположением и последним принятым от другого маяка. Аргументы sin в радианах . Значение в метрах
-			distance2_2_3 = 6372795 * acos ( sin (latt_2) * sin (latt_3) +cos (latt_2) * cos (latt_3) * cos (long_2 - long_3) )  ; 	// Расстояние между текущим местоположением и последним принятым от другого маяка. Аргументы sin в радианах . Значение в метрах
+			latt_3 = (((GPSLatitude / 1000000) + ((GPSLatitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180;				  // РєРѕРѕСЂРґРёРЅР°С‚Р° С‚РµРєСѓС‰РµРіРѕ РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёСЏ РІ СЂР°РґРёР°РЅР°С…
+			long_3 = (((GPSLongitude / 1000000) + ((GPSLongitude % 1000000) / 10000.0) / 60.0) * M_PI) / 180;			  // РєРѕРѕСЂРґРёРЅР°С‚Р° РІ СЂР°РґРёР°РЅР°С…
+			distance2_1_3 = 6372795 * acos(sin(latt_1) * sin(latt_3) + cos(latt_1) * cos(latt_3) * cos(long_1 - long_3)); // Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ С‚РµРєСѓС‰РёРј РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёРµРј Рё РїРѕСЃР»РµРґРЅРёРј РїСЂРёРЅСЏС‚С‹Рј РѕС‚ РґСЂСѓРіРѕРіРѕ РјР°СЏРєР°. РђСЂРіСѓРјРµРЅС‚С‹ sin РІ СЂР°РґРёР°РЅР°С… . Р—РЅР°С‡РµРЅРёРµ РІ РјРµС‚СЂР°С…
+			distance2_2_3 = 6372795 * acos(sin(latt_2) * sin(latt_3) + cos(latt_2) * cos(latt_3) * cos(long_2 - long_3)); // Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ С‚РµРєСѓС‰РёРј РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёРµРј Рё РїРѕСЃР»РµРґРЅРёРј РїСЂРёРЅСЏС‚С‹Рј РѕС‚ РґСЂСѓРіРѕРіРѕ РјР°СЏРєР°. РђСЂРіСѓРјРµРЅС‚С‹ sin РІ СЂР°РґРёР°РЅР°С… . Р—РЅР°С‡РµРЅРёРµ РІ РјРµС‚СЂР°С…
 		}
 
+		//-------------------------------------- LORA TX --------------------------------------------
 
-//-------------------------------------- LORA TX --------------------------------------------
-
-		if ( flagTX == 1)  // поднят флаг запуска передачи
-			{
-				flagTX = 0;
-
-		 // --- заполняем структуру данных  для текущего прибора ------
-				structBuffer[NumberDev].Number = NumberDev;  		// U8 поле Number (номер прибора) структуры structBuffer с номером данного прибора
-				structBuffer[NumberDev].NS_EW = 0x00;				// U8 признак Восток-Запад, Север-Юг. Дополнительные флаги
-				structBuffer[NumberDev].Vacc = VaccAvg; 			// U16 напряжение аккумулятора данного прибора
-				structBuffer[NumberDev].TimeSec = SecRTC;			// U32 текущее время в секундах c начала суток
-				structBuffer[NumberDev].Longitude = GPSLongitude;	// U32 долгота места
-				structBuffer[NumberDev].Latitude = GPSLatitude;		// U32 широта места
-				structBuffer[NumberDev].Altitude = GPSAltitude;		// U32 высота места
-				structBuffer[NumberDev].reserv = Fix;				// U32 резерв Временно Fix - режим работы GPS приемника 1- нет решения, 2- 2D, 3- 3D
-
-				for (i = 0; i < 10; i ++ )  // заполняем буфер передачи. 10 по 24 байта
-				{
-					LORAbufferTX[24 * i + 0] = structBuffer[i].Number;			// 8 бит
-					LORAbufferTX[24 * i + 1] = structBuffer[i].NS_EW;			// 8 бит
-					LORAbufferTX[24 * i + 2] = structBuffer[i].Vacc >> 8;		// 16 бит
-					LORAbufferTX[24 * i + 3] = structBuffer[i].Vacc;
-					LORAbufferTX[24 * i + 4] = structBuffer[i].TimeSec >> 24;	// 32 бита
-					LORAbufferTX[24 * i + 5] = structBuffer[i].TimeSec >> 16;
-					LORAbufferTX[24 * i + 6] = structBuffer[i].TimeSec >> 8;
-					LORAbufferTX[24 * i + 7] = structBuffer[i].TimeSec;
-					LORAbufferTX[24 * i + 8] = structBuffer[i].Longitude >> 24;	// 32 бита
-					LORAbufferTX[24 * i + 9] = structBuffer[i].Longitude >> 16;
-					LORAbufferTX[24 * i + 10] = structBuffer[i].Longitude >> 8;
-					LORAbufferTX[24 * i + 11] = structBuffer[i].Longitude;
-					LORAbufferTX[24 * i + 12] = structBuffer[i].Latitude >> 24;	// 32 бита
-					LORAbufferTX[24 * i + 13] = structBuffer[i].Latitude >> 16;
-					LORAbufferTX[24 * i + 14] = structBuffer[i].Latitude >> 8;
-					LORAbufferTX[24 * i + 15] = structBuffer[i].Latitude;
-					LORAbufferTX[24 * i + 16] = structBuffer[i].Altitude >> 24;	// 32 бита
-					LORAbufferTX[24 * i + 17] = structBuffer[i].Altitude >> 16;
-					LORAbufferTX[24 * i + 18] = structBuffer[i].Altitude >> 8;
-					LORAbufferTX[24 * i + 19] = structBuffer[i].Altitude;
-					LORAbufferTX[24 * i + 20] = structBuffer[i].reserv >> 24;	// 32 бита
-					LORAbufferTX[24 * i + 21] = structBuffer[i].reserv >> 16;
-					LORAbufferTX[24 * i + 22] = structBuffer[i].reserv >> 8;
-					LORAbufferTX[24 * i + 23] = structBuffer[i].reserv;
-				}
-
-				LORAbufferTX[240] = NumberDev;  // в конце посылки добавляем номер устройства, которое передает
-				LORAbufferTX[241] = RFPower;	// и мощность передатчика
-				LORAbufferTX[242] = CounterTxPacket++;			// счетчик пакетов todo
-
-				Radio->SetTxPacket( LORAbufferTX, 255 ); 	// передача пакета ( можно передавать только 243 байт )
-
-
-				counterLed1 = 800;
-				OnLED1();					// зажигаем КРАСНЫЙ светодиод на 800 мс
-				counterTXDisplay = 800;		// рисуем TX 800 мс или пока не произойдет прерывание
-// ----------------------------------------- BLE -----------------------------------------------------------------
-				rprintfInit(BleUsart);  // вывод в BLE NumberDev
-				printf("\n\r\n\r #%d TxPacket at ", NumberDev);
-				Time_Display (structBuffer[NumberDev].TimeSec);
-
-	#ifdef DebugLORAToUART
-		rprintfInit (Terminal); 	// инициализация printf (). Вывод в терминал
-		printf("\n\r\n\r SetTxPacket! \n\r");
-	#endif
-			}
-
-//---------------------------------------------------------------------------------------------------------------------------------------------
-	    LoraProcess();  	// обработка состояний радиоприемника
-
-//		if (counterRXDisplay == 0) // счетчик обнулился
-//		{
-//			if (triggerOffLED0 == 0)
-//			{
-//				triggerOffLED0 = 1;
-//				OffLED0(); 		// гасим СИНИЙ светодиод однократно
-//			}
-//		}
-//		else
-//		{
-//			triggerOffLED0 = 0;
-//		}
-//
-//		if (counterTXDisplay == 0) // счетчик обнулился
-//		{
-//			if (triggerOffLED1 == 0)
-//			{
-//				triggerOffLED1 = 1;
-//				OffLED1(); 		// гасим КРАСНЫЙ светодиод однократно
-//			}
-//		}
-//		else
-//		{
-//			triggerOffLED1 = 0;
-//		}
-
-
-// -------------------------------------- LORA RX -------------------------------- собираем массив структур из пакета принятого по радиоканалу --------------
-		if ( flagRX_OK == 1) 		// по радиоканалу принят новый пакет
+		if (flagTX == 1) // РїРѕРґРЅСЏС‚ С„Р»Р°Рі Р·Р°РїСѓСЃРєР° РїРµСЂРµРґР°С‡Рё
 		{
-			flagRX_OK = 0; 			// сбросили флаг, обрабатываем однократно
+			flagTX = 0;
 
-			for (i=0; i<10; i++) 	// парсим времена
+			// --- Р·Р°РїРѕР»РЅСЏРµРј СЃС‚СЂСѓРєС‚СѓСЂСѓ РґР°РЅРЅС‹С…  РґР»СЏ С‚РµРєСѓС‰РµРіРѕ РїСЂРёР±РѕСЂР° ------
+			structBuffer[NumberDev].Number = NumberDev;		  // U8 РїРѕР»Рµ Number (РЅРѕРјРµСЂ РїСЂРёР±РѕСЂР°) СЃС‚СЂСѓРєС‚СѓСЂС‹ structBuffer СЃ РЅРѕРјРµСЂРѕРј РґР°РЅРЅРѕРіРѕ РїСЂРёР±РѕСЂР°
+			structBuffer[NumberDev].NS_EW = 0x00;			  // U8 РїСЂРёР·РЅР°Рє Р’РѕСЃС‚РѕРє-Р—Р°РїР°Рґ, РЎРµРІРµСЂ-Р®Рі. Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Рµ С„Р»Р°РіРё
+			structBuffer[NumberDev].Vacc = VaccAvg;			  // U16 РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РґР°РЅРЅРѕРіРѕ РїСЂРёР±РѕСЂР°
+			structBuffer[NumberDev].TimeSec = SecRTC;		  // U32 С‚РµРєСѓС‰РµРµ РІСЂРµРјСЏ РІ СЃРµРєСѓРЅРґР°С… c РЅР°С‡Р°Р»Р° СЃСѓС‚РѕРє
+			structBuffer[NumberDev].Longitude = GPSLongitude; // U32 РґРѕР»РіРѕС‚Р° РјРµСЃС‚Р°
+			structBuffer[NumberDev].Latitude = GPSLatitude;	  // U32 С€РёСЂРѕС‚Р° РјРµСЃС‚Р°
+			structBuffer[NumberDev].Altitude = GPSAltitude;	  // U32 РІС‹СЃРѕС‚Р° РјРµСЃС‚Р°
+			structBuffer[NumberDev].reserv = Fix;			  // U32 СЂРµР·РµСЂРІ Р’СЂРµРјРµРЅРЅРѕ Fix - СЂРµР¶РёРј СЂР°Р±РѕС‚С‹ GPS РїСЂРёРµРјРЅРёРєР° 1- РЅРµС‚ СЂРµС€РµРЅРёСЏ, 2- 2D, 3- 3D
+
+			for (i = 0; i < 10; i++) // Р·Р°РїРѕР»РЅСЏРµРј Р±СѓС„РµСЂ РїРµСЂРµРґР°С‡Рё. 10 РїРѕ 24 Р±Р°Р№С‚Р°
 			{
-				TimeNew  = (LORAbufferRX[24 * i + 4]<<24) + (LORAbufferRX[24 * i + 5]<<16) + (LORAbufferRX[24 * i + 6]<<8) + LORAbufferRX[24 * i + 7]; // время в новой посылке
+				LORAbufferTX[24 * i + 0] = structBuffer[i].Number;	  // 8 Р±РёС‚
+				LORAbufferTX[24 * i + 1] = structBuffer[i].NS_EW;	  // 8 Р±РёС‚
+				LORAbufferTX[24 * i + 2] = structBuffer[i].Vacc >> 8; // 16 Р±РёС‚
+				LORAbufferTX[24 * i + 3] = structBuffer[i].Vacc;
+				LORAbufferTX[24 * i + 4] = structBuffer[i].TimeSec >> 24; // 32 Р±РёС‚Р°
+				LORAbufferTX[24 * i + 5] = structBuffer[i].TimeSec >> 16;
+				LORAbufferTX[24 * i + 6] = structBuffer[i].TimeSec >> 8;
+				LORAbufferTX[24 * i + 7] = structBuffer[i].TimeSec;
+				LORAbufferTX[24 * i + 8] = structBuffer[i].Longitude >> 24; // 32 Р±РёС‚Р°
+				LORAbufferTX[24 * i + 9] = structBuffer[i].Longitude >> 16;
+				LORAbufferTX[24 * i + 10] = structBuffer[i].Longitude >> 8;
+				LORAbufferTX[24 * i + 11] = structBuffer[i].Longitude;
+				LORAbufferTX[24 * i + 12] = structBuffer[i].Latitude >> 24; // 32 Р±РёС‚Р°
+				LORAbufferTX[24 * i + 13] = structBuffer[i].Latitude >> 16;
+				LORAbufferTX[24 * i + 14] = structBuffer[i].Latitude >> 8;
+				LORAbufferTX[24 * i + 15] = structBuffer[i].Latitude;
+				LORAbufferTX[24 * i + 16] = structBuffer[i].Altitude >> 24; // 32 Р±РёС‚Р°
+				LORAbufferTX[24 * i + 17] = structBuffer[i].Altitude >> 16;
+				LORAbufferTX[24 * i + 18] = structBuffer[i].Altitude >> 8;
+				LORAbufferTX[24 * i + 19] = structBuffer[i].Altitude;
+				LORAbufferTX[24 * i + 20] = structBuffer[i].reserv >> 24; // 32 Р±РёС‚Р°
+				LORAbufferTX[24 * i + 21] = structBuffer[i].reserv >> 16;
+				LORAbufferTX[24 * i + 22] = structBuffer[i].reserv >> 8;
+				LORAbufferTX[24 * i + 23] = structBuffer[i].reserv;
+			}
 
-				// сравниваем со старыми временами
-				if (TimeNew  > TimesOld [i]) // если данные более свежие, то
+			LORAbufferTX[240] = NumberDev;		   // РІ РєРѕРЅС†Рµ РїРѕСЃС‹Р»РєРё РґРѕР±Р°РІР»СЏРµРј РЅРѕРјРµСЂ СѓСЃС‚СЂРѕР№СЃС‚РІР°, РєРѕС‚РѕСЂРѕРµ РїРµСЂРµРґР°РµС‚
+			LORAbufferTX[241] = RFPower;		   // Рё РјРѕС‰РЅРѕСЃС‚СЊ РїРµСЂРµРґР°С‚С‡РёРєР°
+			LORAbufferTX[242] = CounterTxPacket++; // СЃС‡РµС‚С‡РёРє РїР°РєРµС‚РѕРІ todo
+
+			Radio->SetTxPacket(LORAbufferTX, 255); // РїРµСЂРµРґР°С‡Р° РїР°РєРµС‚Р° ( РјРѕР¶РЅРѕ РїРµСЂРµРґР°РІР°С‚СЊ С‚РѕР»СЊРєРѕ 243 Р±Р°Р№С‚ )
+
+			counterLed1 = 800;
+			OnLED1();				// Р·Р°Р¶РёРіР°РµРј РљР РђРЎРќР«Р™ СЃРІРµС‚РѕРґРёРѕРґ РЅР° 800 РјСЃ
+			counterTXDisplay = 800; // СЂРёСЃСѓРµРј TX 800 РјСЃ РёР»Рё РїРѕРєР° РЅРµ РїСЂРѕРёР·РѕР№РґРµС‚ РїСЂРµСЂС‹РІР°РЅРёРµ
+									// ----------------------------------------- BLE -----------------------------------------------------------------
+			rprintfInit(BleUsart);	// РІС‹РІРѕРґ РІ BLE NumberDev
+			printf("\n\r\n\r #%d TxPacket at ", NumberDev);
+			Time_Display(structBuffer[NumberDev].TimeSec);
+
+#ifdef DebugLORAToUART
+			rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+			printf("\n\r\n\r SetTxPacket! \n\r");
+#endif
+		}
+
+		//---------------------------------------------------------------------------------------------------------------------------------------------
+		LoraProcess(); // РѕР±СЂР°Р±РѕС‚РєР° СЃРѕСЃС‚РѕСЏРЅРёР№ СЂР°РґРёРѕРїСЂРёРµРјРЅРёРєР°
+
+		//		if (counterRXDisplay == 0) // СЃС‡РµС‚С‡РёРє РѕР±РЅСѓР»РёР»СЃСЏ
+		//		{
+		//			if (triggerOffLED0 == 0)
+		//			{
+		//				triggerOffLED0 = 1;
+		//				OffLED0(); 		// РіР°СЃРёРј РЎРРќРР™ СЃРІРµС‚РѕРґРёРѕРґ РѕРґРЅРѕРєСЂР°С‚РЅРѕ
+		//			}
+		//		}
+		//		else
+		//		{
+		//			triggerOffLED0 = 0;
+		//		}
+		//
+		//		if (counterTXDisplay == 0) // СЃС‡РµС‚С‡РёРє РѕР±РЅСѓР»РёР»СЃСЏ
+		//		{
+		//			if (triggerOffLED1 == 0)
+		//			{
+		//				triggerOffLED1 = 1;
+		//				OffLED1(); 		// РіР°СЃРёРј РљР РђРЎРќР«Р™ СЃРІРµС‚РѕРґРёРѕРґ РѕРґРЅРѕРєСЂР°С‚РЅРѕ
+		//			}
+		//		}
+		//		else
+		//		{
+		//			triggerOffLED1 = 0;
+		//		}
+
+		// -------------------------------------- LORA RX -------------------------------- СЃРѕР±РёСЂР°РµРј РјР°СЃСЃРёРІ СЃС‚СЂСѓРєС‚СѓСЂ РёР· РїР°РєРµС‚Р° РїСЂРёРЅСЏС‚РѕРіРѕ РїРѕ СЂР°РґРёРѕРєР°РЅР°Р»Сѓ --------------
+		if (flagRX_OK == 1) // РїРѕ СЂР°РґРёРѕРєР°РЅР°Р»Сѓ РїСЂРёРЅСЏС‚ РЅРѕРІС‹Р№ РїР°РєРµС‚
+		{
+			flagRX_OK = 0; // СЃР±СЂРѕСЃРёР»Рё С„Р»Р°Рі, РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РѕРґРЅРѕРєСЂР°С‚РЅРѕ
+
+			for (i = 0; i < 10; i++) // РїР°СЂСЃРёРј РІСЂРµРјРµРЅР°
+			{
+				TimeNew = (LORAbufferRX[24 * i + 4] << 24) + (LORAbufferRX[24 * i + 5] << 16) + (LORAbufferRX[24 * i + 6] << 8) + LORAbufferRX[24 * i + 7]; // РІСЂРµРјСЏ РІ РЅРѕРІРѕР№ РїРѕСЃС‹Р»РєРµ
+
+				// СЃСЂР°РІРЅРёРІР°РµРј СЃРѕ СЃС‚Р°СЂС‹РјРё РІСЂРµРјРµРЅР°РјРё
+				if (TimeNew > TimesOld[i]) // РµСЃР»Рё РґР°РЅРЅС‹Рµ Р±РѕР»РµРµ СЃРІРµР¶РёРµ, С‚Рѕ
 				{
-					TimesOld [i] = TimeNew; // обновляем время
+					TimesOld[i] = TimeNew; // РѕР±РЅРѕРІР»СЏРµРј РІСЂРµРјСЏ
 
-					structBuffer[i].Number = 	LORAbufferRX[24 * i + 0]; // обновляем все параметры в структуре
-					structBuffer[i].NS_EW = 	LORAbufferRX[24 * i + 1];
-					structBuffer[i].Vacc = 		(LORAbufferRX[24 * i + 2]<<8) + LORAbufferRX[24 * i + 3];
-					structBuffer[i].TimeSec = 	(LORAbufferRX[24 * i + 4]<<24) + (LORAbufferRX[24 * i + 5]<<16) + (LORAbufferRX[24 * i + 6]<<8) + LORAbufferRX[24 * i + 7]; // оно же TimeNew
-					structBuffer[i].Longitude = (LORAbufferRX[24 * i + 8]<<24) + (LORAbufferRX[24 * i + 9]<<16) + (LORAbufferRX[24 * i + 10]<<8) + LORAbufferRX[24 * i + 11];
-					structBuffer[i].Latitude =  (LORAbufferRX[24 * i + 12]<<24) + (LORAbufferRX[24 * i + 13]<<16) + (LORAbufferRX[24 * i + 14]<<8) + LORAbufferRX[24 * i + 15];
-					structBuffer[i].Altitude =  (LORAbufferRX[24 * i + 16]<<24) + (LORAbufferRX[24 * i + 17]<<16) + (LORAbufferRX[24 * i + 18]<<8) + LORAbufferRX[24 * i + 19];
-					structBuffer[i].reserv = 	(LORAbufferRX[24 * i + 20]<<24) + (LORAbufferRX[24 * i + 21]<<16) + (LORAbufferRX[24 * i + 22]<<8) + LORAbufferRX[24 * i + 23];
+					structBuffer[i].Number = LORAbufferRX[24 * i + 0]; // РѕР±РЅРѕРІР»СЏРµРј РІСЃРµ РїР°СЂР°РјРµС‚СЂС‹ РІ СЃС‚СЂСѓРєС‚СѓСЂРµ
+					structBuffer[i].NS_EW = LORAbufferRX[24 * i + 1];
+					structBuffer[i].Vacc = (LORAbufferRX[24 * i + 2] << 8) + LORAbufferRX[24 * i + 3];
+					structBuffer[i].TimeSec = (LORAbufferRX[24 * i + 4] << 24) + (LORAbufferRX[24 * i + 5] << 16) + (LORAbufferRX[24 * i + 6] << 8) + LORAbufferRX[24 * i + 7]; // РѕРЅРѕ Р¶Рµ TimeNew
+					structBuffer[i].Longitude = (LORAbufferRX[24 * i + 8] << 24) + (LORAbufferRX[24 * i + 9] << 16) + (LORAbufferRX[24 * i + 10] << 8) + LORAbufferRX[24 * i + 11];
+					structBuffer[i].Latitude = (LORAbufferRX[24 * i + 12] << 24) + (LORAbufferRX[24 * i + 13] << 16) + (LORAbufferRX[24 * i + 14] << 8) + LORAbufferRX[24 * i + 15];
+					structBuffer[i].Altitude = (LORAbufferRX[24 * i + 16] << 24) + (LORAbufferRX[24 * i + 17] << 16) + (LORAbufferRX[24 * i + 18] << 8) + LORAbufferRX[24 * i + 19];
+					structBuffer[i].reserv = (LORAbufferRX[24 * i + 20] << 24) + (LORAbufferRX[24 * i + 21] << 16) + (LORAbufferRX[24 * i + 22] << 8) + LORAbufferRX[24 * i + 23];
 				}
 			}
 
-			NumberTransmitted = LORAbufferRX[240]; 								// от какого номера пришла посылка
-			LoraRX [NumberTransmitted].Power = LORAbufferRX[241]; 				// с какой мощностью он передает
-			LoraRX [NumberTransmitted].FreqError = (s32)FreqError; 				// измеренное смещение частоты при приеме посылки
-			LoraRX [NumberTransmitted].RSSI = (s16)SX1276LoRaGetPacketRssi();	// измеренный уровень сигнала
-			LoraRX [NumberTransmitted].SNR = SX1276GetPacketSnr();				// измеренное соотношение сигнал-шум в пакете
-			LoraRX [NumberTransmitted].CounterTxP = LORAbufferRX[242]; 			// счетчик переданных пакетов todo
+			NumberTransmitted = LORAbufferRX[240];							 // РѕС‚ РєР°РєРѕРіРѕ РЅРѕРјРµСЂР° РїСЂРёС€Р»Р° РїРѕСЃС‹Р»РєР°
+			LoraRX[NumberTransmitted].Power = LORAbufferRX[241];			 // СЃ РєР°РєРѕР№ РјРѕС‰РЅРѕСЃС‚СЊСЋ РѕРЅ РїРµСЂРµРґР°РµС‚
+			LoraRX[NumberTransmitted].FreqError = (s32)FreqError;			 // РёР·РјРµСЂРµРЅРЅРѕРµ СЃРјРµС‰РµРЅРёРµ С‡Р°СЃС‚РѕС‚С‹ РїСЂРё РїСЂРёРµРјРµ РїРѕСЃС‹Р»РєРё
+			LoraRX[NumberTransmitted].RSSI = (s16)SX1276LoRaGetPacketRssi(); // РёР·РјРµСЂРµРЅРЅС‹Р№ СѓСЂРѕРІРµРЅСЊ СЃРёРіРЅР°Р»Р°
+			LoraRX[NumberTransmitted].SNR = SX1276GetPacketSnr();			 // РёР·РјРµСЂРµРЅРЅРѕРµ СЃРѕРѕС‚РЅРѕС€РµРЅРёРµ СЃРёРіРЅР°Р»-С€СѓРј РІ РїР°РєРµС‚Рµ
+			LoraRX[NumberTransmitted].CounterTxP = LORAbufferRX[242];		 // СЃС‡РµС‚С‡РёРє РїРµСЂРµРґР°РЅРЅС‹С… РїР°РєРµС‚РѕРІ todo
 
-			counterRssiReset [NumberTransmitted] = 11000; 	// заводим таймер для сброса LoraRssi от маяка на 11 секунд
+			counterRssiReset[NumberTransmitted] = 11000; // Р·Р°РІРѕРґРёРј С‚Р°Р№РјРµСЂ РґР»СЏ СЃР±СЂРѕСЃР° LoraRssi РѕС‚ РјР°СЏРєР° РЅР° 11 СЃРµРєСѓРЅРґ
 
-
-
-			LoraRssiMax = -130;  // сброс на минимум
-			for (i=0; i<10; i++) // поиск наибольшего уровня RSSI
+			LoraRssiMax = -130;		 // СЃР±СЂРѕСЃ РЅР° РјРёРЅРёРјСѓРј
+			for (i = 0; i < 10; i++) // РїРѕРёСЃРє РЅР°РёР±РѕР»СЊС€РµРіРѕ СѓСЂРѕРІРЅСЏ RSSI
 			{
-				if ( (LoraRX [i].RSSI != 0) && (LoraRX [i].RSSI > LoraRssiMax) )
+				if ((LoraRX[i].RSSI != 0) && (LoraRX[i].RSSI > LoraRssiMax))
 				{
-					LoraRssiMax = LoraRX [i].RSSI; 	// нашли максимальный сигнал
+					LoraRssiMax = LoraRX[i].RSSI; // РЅР°С€Р»Рё РјР°РєСЃРёРјР°Р»СЊРЅС‹Р№ СЃРёРіРЅР°Р»
 
-					counterMaxRssiReset = 11000; 	// заводим таймер для сброса LoraRssiMax на 11 секунд
+					counterMaxRssiReset = 11000; // Р·Р°РІРѕРґРёРј С‚Р°Р№РјРµСЂ РґР»СЏ СЃР±СЂРѕСЃР° LoraRssiMax РЅР° 11 СЃРµРєСѓРЅРґ
 				}
-
 			}
 
-
-			if (SecRTC > 0) // если время SecRTC уже определено
-				{
-					if ( TimeSecFirstRX [NumberTransmitted] == 0)		// если до этого время еще не сохранялось
-						TimeSecFirstRX [NumberTransmitted] = SecRTC;	// запоминаем время первого приема сигнала от конкретного маяка для вычисления PER
-
-					CountRX [NumberTransmitted] ++ ; 	// считаем сколько посылок было принято от каждого маяка
-				}
-
-			// вычисление PER если был принят пакет
-			for (i=0; i<10; i++)  // проходим по всем маякам
+			if (SecRTC > 0) // РµСЃР»Рё РІСЂРµРјСЏ SecRTC СѓР¶Рµ РѕРїСЂРµРґРµР»РµРЅРѕ
 			{
-				if ( TimeSecFirstRX [i] > 0) // если уже были приняты посылки
-				{	// вычисляем PER для каждого из маяков в сети в виде 100.00 % (делить на 100)
-					PER [i] =10000 - ((u32)CountRX [i] * 10000) / ( (SecRTC - TimeSecFirstRX [i])  / 10 + 1);
+				if (TimeSecFirstRX[NumberTransmitted] == 0)		// РµСЃР»Рё РґРѕ СЌС‚РѕРіРѕ РІСЂРµРјСЏ РµС‰Рµ РЅРµ СЃРѕС…СЂР°РЅСЏР»РѕСЃСЊ
+					TimeSecFirstRX[NumberTransmitted] = SecRTC; // Р·Р°РїРѕРјРёРЅР°РµРј РІСЂРµРјСЏ РїРµСЂРІРѕРіРѕ РїСЂРёРµРјР° СЃРёРіРЅР°Р»Р° РѕС‚ РєРѕРЅРєСЂРµС‚РЅРѕРіРѕ РјР°СЏРєР° РґР»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ PER
+
+				CountRX[NumberTransmitted]++; // СЃС‡РёС‚Р°РµРј СЃРєРѕР»СЊРєРѕ РїРѕСЃС‹Р»РѕРє Р±С‹Р»Рѕ РїСЂРёРЅСЏС‚Рѕ РѕС‚ РєР°Р¶РґРѕРіРѕ РјР°СЏРєР°
+			}
+
+			// РІС‹С‡РёСЃР»РµРЅРёРµ PER РµСЃР»Рё Р±С‹Р» РїСЂРёРЅСЏС‚ РїР°РєРµС‚
+			for (i = 0; i < 10; i++) // РїСЂРѕС…РѕРґРёРј РїРѕ РІСЃРµРј РјР°СЏРєР°Рј
+			{
+				if (TimeSecFirstRX[i] > 0) // РµСЃР»Рё СѓР¶Рµ Р±С‹Р»Рё РїСЂРёРЅСЏС‚С‹ РїРѕСЃС‹Р»РєРё
+				{						   // РІС‹С‡РёСЃР»СЏРµРј PER РґР»СЏ РєР°Р¶РґРѕРіРѕ РёР· РјР°СЏРєРѕРІ РІ СЃРµС‚Рё РІ РІРёРґРµ 100.00 % (РґРµР»РёС‚СЊ РЅР° 100)
+					PER[i] = 10000 - ((u32)CountRX[i] * 10000) / ((SecRTC - TimeSecFirstRX[i]) / 10 + 1);
 				}
 			}
-// ------------------------------------------------------------ BLE --------------------------------------------------------------------------------------
-			rprintfInit(BleUsart);  // вывод в BLE
+			// ------------------------------------------------------------ BLE --------------------------------------------------------------------------------------
+			rprintfInit(BleUsart); // РІС‹РІРѕРґ РІ BLE
 
-			printf("\n\r\n\r #%d RSSI: %d dBm  FreqEr: %d Hz  SNR: %d dB",NumberTransmitted, LoraRX [NumberTransmitted].RSSI, LoraRX [NumberTransmitted].FreqError, LoraRX [NumberTransmitted].SNR);
-			if (PER [NumberTransmitted] != 65535)
-				printf(" PER: %d.%02d%%", PER[NumberTransmitted]/100, PER[NumberTransmitted]%100);
+			printf("\n\r\n\r #%d RSSI: %d dBm  FreqEr: %d Hz  SNR: %d dB", NumberTransmitted, LoraRX[NumberTransmitted].RSSI, LoraRX[NumberTransmitted].FreqError, LoraRX[NumberTransmitted].SNR);
+			if (PER[NumberTransmitted] != 65535)
+				printf(" PER: %d.%02d%%", PER[NumberTransmitted] / 100, PER[NumberTransmitted] % 100);
 
 			printf("\n\r Time: ");
-			Time_Display (structBuffer[NumberTransmitted].TimeSec);
-			printf(" Latt: %d Long: %d \n\r",  structBuffer[NumberTransmitted].Latitude, structBuffer[NumberTransmitted].Longitude);
+			Time_Display(structBuffer[NumberTransmitted].TimeSec);
+			printf(" Latt: %d Long: %d \n\r", structBuffer[NumberTransmitted].Latitude, structBuffer[NumberTransmitted].Longitude);
 
 			temp3 = distance1_1_2 * 10;
-			printf (" 1-2: %d.%d m ", temp3 / 10,  temp3 % 10 ); // расстояние метрах
+			printf(" 1-2: %d.%d m ", temp3 / 10, temp3 % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РјРµС‚СЂР°С…
 
 			temp3 = distance1_1_3 * 10;
-			printf ("1-3: %d.%d m ", temp3 / 10,  temp3 % 10 ); // расстояние метрах
+			printf("1-3: %d.%d m ", temp3 / 10, temp3 % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РјРµС‚СЂР°С…
 
 			temp3 = distance1_2_3 * 10;
-			printf ("2-3: %d.%d m ", temp3 / 10,  temp3 % 10 ); // расстояние метрах
+			printf("2-3: %d.%d m ", temp3 / 10, temp3 % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РјРµС‚СЂР°С…
 		}
-// -------------------------------------------------------------------------------------------------------------------------------------------------------
+		// -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-		for ( i = 0; i < 10; i ++) // проходим по всем счетчикам сброса RSSI
+		for (i = 0; i < 10; i++) // РїСЂРѕС…РѕРґРёРј РїРѕ РІСЃРµРј СЃС‡РµС‚С‡РёРєР°Рј СЃР±СЂРѕСЃР° RSSI
 		{
-			if ( counterRssiReset[i] == 0)
-				LoraRX [i].RSSI = 0;  	// сбрасываем RSSI на начальное значение
-
-		}
-
-		// сброс индикатора уровня сигнала LORA
-		if (counterMaxRssiReset == 0) // таймер обнулился
-		{
-			LoraRssiMax = -130; // сброс на минимум
+			if (counterRssiReset[i] == 0)
+				LoraRX[i].RSSI = 0; // СЃР±СЂР°СЃС‹РІР°РµРј RSSI РЅР° РЅР°С‡Р°Р»СЊРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 		}
 
-		// вычисление PER еще раз, если пакет не пришел вовремя
-		for (i=0; i<10; i++)  // проходим по всем маякам
+		// СЃР±СЂРѕСЃ РёРЅРґРёРєР°С‚РѕСЂР° СѓСЂРѕРІРЅСЏ СЃРёРіРЅР°Р»Р° LORA
+		if (counterMaxRssiReset == 0) // С‚Р°Р№РјРµСЂ РѕР±РЅСѓР»РёР»СЃСЏ
 		{
-			if ( TimeSecFirstRX [i] > 0) // если уже были приняты посылки
-			{	// вычисляем PER для каждого из маяков в сети в виде 100.00 % (делить на 100)
-				PER [i] =10000 - ((u32)CountRX [i] * 10000) / ( (SecRTC - TimeSecFirstRX [i])  / 10 + 1) ;
+			LoraRssiMax = -130; // СЃР±СЂРѕСЃ РЅР° РјРёРЅРёРјСѓРј
+		}
+
+		// РІС‹С‡РёСЃР»РµРЅРёРµ PER РµС‰Рµ СЂР°Р·, РµСЃР»Рё РїР°РєРµС‚ РЅРµ РїСЂРёС€РµР» РІРѕРІСЂРµРјСЏ
+		for (i = 0; i < 10; i++) // РїСЂРѕС…РѕРґРёРј РїРѕ РІСЃРµРј РјР°СЏРєР°Рј
+		{
+			if (TimeSecFirstRX[i] > 0) // РµСЃР»Рё СѓР¶Рµ Р±С‹Р»Рё РїСЂРёРЅСЏС‚С‹ РїРѕСЃС‹Р»РєРё
+			{						   // РІС‹С‡РёСЃР»СЏРµРј PER РґР»СЏ РєР°Р¶РґРѕРіРѕ РёР· РјР°СЏРєРѕРІ РІ СЃРµС‚Рё РІ РІРёРґРµ 100.00 % (РґРµР»РёС‚СЊ РЅР° 100)
+				PER[i] = 10000 - ((u32)CountRX[i] * 10000) / ((SecRTC - TimeSecFirstRX[i]) / 10 + 1);
 			}
 		}
 
+		MeasVoltage(); // РёР·РјРµСЂРµРЅРёРµ РЅР°РїСЂСЏР¶РµРЅРёР№ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°, РїРёС‚Р°РЅРёСЏ Рё Р±Р°С‚Р°СЂРµРё, РїСЂРѕРІРµСЂРєР° Р·Р°СЂСЏРґР°
 
-	    MeasVoltage();		// измерение напряжений аккумулятора, питания и батареи, проверка заряда
+		if (VaccAvg < VaccPowerOff) // РµСЃР»Рё РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РјРµРЅСЊС€Рµ РїРѕСЂРѕРіР°
+		{
+			NRESET_off();  // РІС‹РєР»СЋС‡Р°РµРј GPS
+			OnResetBLE();  // СЃР±СЂРѕСЃ BLE
+			OnResetLORA(); // СЃР±СЂРѕСЃ LORA
 
-	    if (VaccAvg < VaccPowerOff)	// если напряжение аккумулятора меньше порога
-	   	{
-	    	NRESET_off();  	// выключаем GPS
-	        OnResetBLE();	// сброс BLE
-	        OnResetLORA();	// сброс LORA
+			Display2(); // РЅР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° Рё Р±Р°С‚Р°СЂРµРё
 
-	        Display2(); 	// напряжения аккумулятора и батареи
-
-			while ( DMA_GetFlagStatus(DMA1_FLAG_TC6) == 0  )	// ждем пока закончится текущая транзакция по DMA
-			{}
-//OffLED1();
-			// Disable the DMA1 Channel 6
+			while (DMA_GetFlagStatus(DMA1_FLAG_TC6) == 0) // Р¶РґРµРј РїРѕРєР° Р·Р°РєРѕРЅС‡РёС‚СЃСЏ С‚РµРєСѓС‰Р°СЏ С‚СЂР°РЅР·Р°РєС†РёСЏ РїРѕ DMA
+			{
+			}
+			// OffLED1();
+			//  Disable the DMA1 Channel 6
 			DMA_Cmd(DMA1_Channel6, DISABLE);
 			// Clear the DMA Transfer complete flag
 			DMA_ClearFlag(DMA1_FLAG_TC6);
 
 			// EV8_2: Wait until BTF is set before programming the STOP
-			while ((I2C1->SR1 & 0x00004) != 0x000004);
+			while ((I2C1->SR1 & 0x00004) != 0x000004)
+				;
 			// Program the STOP
-			I2C1->CR1 |= 0x0200 ; //CR1_STOP_Set;
+			I2C1->CR1 |= 0x0200; // CR1_STOP_Set;
 			// Make sure that the STOP bit is cleared by Hardware
-			while ((I2C1->CR1&0x200) == 0x200);
+			while ((I2C1->CR1 & 0x200) == 0x200)
+				;
 
-//OnLED1();
-			SSD1306_UpdateScreenDMA();	  // запуск нового обновления экрана из видеобуфера
-
+			// OnLED1();
+			SSD1306_UpdateScreenDMA(); // Р·Р°РїСѓСЃРє РЅРѕРІРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ СЌРєСЂР°РЅР° РёР· РІРёРґРµРѕР±СѓС„РµСЂР°
 
 			while (1)
 			{
-				ScanKeyPowerOff();	// обработка нажатий кнопок
+				ScanKeyPowerOff(); // РѕР±СЂР°Р±РѕС‚РєР° РЅР°Р¶Р°С‚РёР№ РєРЅРѕРїРѕРє
 				ScanKeySOS();
 			}
 
-	        STOP
-	    	//OffVcc1(); 		// выключаем питание
-	   	}
+			STOP
+			// OffVcc1(); 		// РІС‹РєР»СЋС‡Р°РµРј РїРёС‚Р°РЅРёРµ
+		}
 
+		ScanKeyPowerOff(); // РѕР±СЂР°Р±РѕС‚РєР° РЅР°Р¶Р°С‚РёР№ РєРЅРѕРїРѕРє
+		ScanKeySOS();
 
-
-	    ScanKeyPowerOff();	// обработка нажатий кнопок
-	    ScanKeySOS();
-
-	    if (ScreenMode == ReleaseMode)
-	    {
-	    	switch (screen)	// переключение информации на OLED дисплее
-				{
-				case 1:
-					Display1Release(); // основной экран
-					break;
-				case 2:
-					Display2Release(); // расстояния между маяками
-					break;
-				case 3:
-					Display3Release(); // информация GPS
-					break;
-
-				default:
-					screen = 1;
-				}
-	    }
-	    else
-	    {
-	    switch (screen)	// переключение информации на OLED дисплее
+		if (ScreenMode == ReleaseMode)
+		{
+			switch (screen) // РїРµСЂРµРєР»СЋС‡РµРЅРёРµ РёРЅС„РѕСЂРјР°С†РёРё РЅР° OLED РґРёСЃРїР»РµРµ
 			{
 			case 1:
-				Display1(); // информация GPS
+				Display1Release(); // РѕСЃРЅРѕРІРЅРѕР№ СЌРєСЂР°РЅ
 				break;
 			case 2:
-				Display2(); // напряжения аккумулятора и батареи
+				Display2Release(); // СЂР°СЃСЃС‚РѕСЏРЅРёСЏ РјРµР¶РґСѓ РјР°СЏРєР°РјРё
 				break;
 			case 3:
-				Display3(); // часы реального времени RTC
+				Display3Release(); // РёРЅС„РѕСЂРјР°С†РёСЏ GPS
+				break;
+
+			default:
+				screen = 1;
+			}
+		}
+		else
+		{
+			switch (screen) // РїРµСЂРµРєР»СЋС‡РµРЅРёРµ РёРЅС„РѕСЂРјР°С†РёРё РЅР° OLED РґРёСЃРїР»РµРµ
+			{
+			case 1:
+				Display1(); // РёРЅС„РѕСЂРјР°С†РёСЏ GPS
+				break;
+			case 2:
+				Display2(); // РЅР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° Рё Р±Р°С‚Р°СЂРµРё
+				break;
+			case 3:
+				Display3(); // С‡Р°СЃС‹ СЂРµР°Р»СЊРЅРѕРіРѕ РІСЂРµРјРµРЅРё RTC
 				break;
 			case 4:
-				Display4(); // уровень сигнала со спутников в виде ID S/N dB
+				Display4(); // СѓСЂРѕРІРµРЅСЊ СЃРёРіРЅР°Р»Р° СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ РІ РІРёРґРµ ID S/N dB
 				break;
 			case 5:
-				Display5(); // уровень сигнала со спутников в графическом виде
+				Display5(); // СѓСЂРѕРІРµРЅСЊ СЃРёРіРЅР°Р»Р° СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ РІ РіСЂР°С„РёС‡РµСЃРєРѕРј РІРёРґРµ
 				break;
 			case 6:
-				Display6(); // информация о спутниках, используемых в решении и параметрах DOP
+				Display6(); // РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ СЃРїСѓС‚РЅРёРєР°С…, РёСЃРїРѕР»СЊР·СѓРµРјС‹С… РІ СЂРµС€РµРЅРёРё Рё РїР°СЂР°РјРµС‚СЂР°С… DOP
 				break;
 			case 7:
-				Display7(); // координаты, высота в u32
+				Display7(); // РєРѕРѕСЂРґРёРЅР°С‚С‹, РІС‹СЃРѕС‚Р° РІ u32
 				break;
 			case 8:
-				Display8(); // измерение периода 1PPS
+				Display8(); // РёР·РјРµСЂРµРЅРёРµ РїРµСЂРёРѕРґР° 1PPS
 				break;
 			case 9:
-				Display9(); // данные с приемника LORA
+				Display9(); // РґР°РЅРЅС‹Рµ СЃ РїСЂРёРµРјРЅРёРєР° LORA
 				break;
 			case 10:
-				Display10(); // данные с приемника LORA координаты
+				Display10(); // РґР°РЅРЅС‹Рµ СЃ РїСЂРёРµРјРЅРёРєР° LORA РєРѕРѕСЂРґРёРЅР°С‚С‹
 				break;
 			case 11:
-				Display11(); // данные с приемника LORA времена
+				Display11(); // РґР°РЅРЅС‹Рµ СЃ РїСЂРёРµРјРЅРёРєР° LORA РІСЂРµРјРµРЅР°
 				break;
 			case 12:
-				Display12(); // параметры принятых посылок
+				Display12(); // РїР°СЂР°РјРµС‚СЂС‹ РїСЂРёРЅСЏС‚С‹С… РїРѕСЃС‹Р»РѕРє
 				break;
 			case 13:
-				Display13(); // PER от каждого из маяков
+				Display13(); // PER РѕС‚ РєР°Р¶РґРѕРіРѕ РёР· РјР°СЏРєРѕРІ
 				break;
 			case 14:
-				Display14(); // расстояние между маяками
+				Display14(); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ РјР°СЏРєР°РјРё
 				break;
 			case 15:
-				Display15(); // уровни сигнала от маяков в графическом виде
+				Display15(); // СѓСЂРѕРІРЅРё СЃРёРіРЅР°Р»Р° РѕС‚ РјР°СЏРєРѕРІ РІ РіСЂР°С„РёС‡РµСЃРєРѕРј РІРёРґРµ
 				break;
 			}
-	    }
+		}
 
-
-//OnLED0();
-		//if ( counterLcdOff > 0)
+		// OnLED0();
+		// if ( counterLcdOff > 0)
 		//{
-				// DMA end of transfer  Закончилась передача в I2C по DMA
-			if ( DMA_GetFlagStatus(DMA1_FLAG_TC6) == 1  )
-			{
-	//OffLED1();
-				// Disable the DMA1 Channel 6
-				DMA_Cmd(DMA1_Channel6, DISABLE);
-				// Clear the DMA Transfer complete flag
-				DMA_ClearFlag(DMA1_FLAG_TC6);
+		//  DMA end of transfer  Р—Р°РєРѕРЅС‡РёР»Р°СЃСЊ РїРµСЂРµРґР°С‡Р° РІ I2C РїРѕ DMA
+		if (DMA_GetFlagStatus(DMA1_FLAG_TC6) == 1)
+		{
+			// OffLED1();
+			//  Disable the DMA1 Channel 6
+			DMA_Cmd(DMA1_Channel6, DISABLE);
+			// Clear the DMA Transfer complete flag
+			DMA_ClearFlag(DMA1_FLAG_TC6);
 
-				// EV8_2: Wait until BTF is set before programming the STOP
-				while ((I2C1->SR1 & 0x00004) != 0x000004);
-				// Program the STOP
-				I2C1->CR1 |= 0x0200 ; //CR1_STOP_Set;
-				// Make sure that the STOP bit is cleared by Hardware
-				while ((I2C1->CR1&0x200) == 0x200);
+			// EV8_2: Wait until BTF is set before programming the STOP
+			while ((I2C1->SR1 & 0x00004) != 0x000004)
+				;
+			// Program the STOP
+			I2C1->CR1 |= 0x0200; // CR1_STOP_Set;
+			// Make sure that the STOP bit is cleared by Hardware
+			while ((I2C1->CR1 & 0x200) == 0x200)
+				;
 
-	//OnLED1();
-				if ( counterLcdOff > 0)
-					SSD1306_UpdateScreenDMA();	  // запуск нового обновления экрана из видеобуфера
-				else
-					SSD1306_OFF ();
-			}
+			// OnLED1();
+			if (counterLcdOff > 0)
+				SSD1306_UpdateScreenDMA(); // Р·Р°РїСѓСЃРє РЅРѕРІРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ СЌРєСЂР°РЅР° РёР· РІРёРґРµРѕР±СѓС„РµСЂР°
+			else
+				SSD1306_OFF();
+		}
 		//}
-//OffLED0();
-
+		// OffLED0();
 
 	} // END of MAIN LOOP
-//=====================================================================================================
+	//=====================================================================================================
 }
 
 /************************************************************************************************************************************************************************
 *************************************************************/
-// ----------- Инициализация микроконтроллера, настройка
-void init				(void)
+// ----------- РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РјРёРєСЂРѕРєРѕРЅС‚СЂРѕР»Р»РµСЂР°, РЅР°СЃС‚СЂРѕР№РєР°
+void init(void)
 {
-	RCC_Configuration(); 	// настройка схемы тактирования
-	SysTick_Config(72000-1);// системный таймер тикает каждую мс
-	PortIO_Configuration();	// настройка портов
-OnVcc1();		// удерживаем 1 на линейных стабилизаторах
-	USART1_Configuration();	// настройка USART1
-	USART2_Configuration();	// настройка USART2
-	USART3_Configuration();	// настройка USART3
-	TIM1_Configuration();	// настройка Timer1 - таймер формирует сигнал синхронизации для временного разделения каналов LORA сети. Синхронизируется по 1PPS от GPS модуля
-	TIM2_Configuration();	// настройка Timer2 - таймер формирует таймаут для приема посылки по usart2
-    TIM3_Configuration();	// настройка Timer3 - таймер формирует таймаут для приема посылки по usart3
-    TIM4_Configuration();	// настройка Timer4 - таймер измеряет период сигнала 1PPS, для синхронизации LORA сети в отсутсвии сигнала 1PPS от GPS модуля
-    SPI1_Configuration();	// настройка SPI1
-	NVIC_Configuration();	// настройка прерываний
-	ADC1_Configuration();	// настройка АЦП
-	EXTI_Configuration();	// настройка внешнего прерывания на PB12
-	DMA_Configuration ();	// настройка DMA для I2C дисплея
+	RCC_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° СЃС…РµРјС‹ С‚Р°РєС‚РёСЂРѕРІР°РЅРёСЏ
+	SysTick_Config(72000 - 1); // СЃРёСЃС‚РµРјРЅС‹Р№ С‚Р°Р№РјРµСЂ С‚РёРєР°РµС‚ РєР°Р¶РґСѓСЋ РјСЃ
+	PortIO_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° РїРѕСЂС‚РѕРІ
+	OnVcc1();				   // СѓРґРµСЂР¶РёРІР°РµРј 1 РЅР° Р»РёРЅРµР№РЅС‹С… СЃС‚Р°Р±РёР»РёР·Р°С‚РѕСЂР°С…
+	USART1_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° USART1
+	USART2_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° USART2
+	USART3_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° USART3
+	TIM1_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° Timer1 - С‚Р°Р№РјРµСЂ С„РѕСЂРјРёСЂСѓРµС‚ СЃРёРіРЅР°Р» СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РґР»СЏ РІСЂРµРјРµРЅРЅРѕРіРѕ СЂР°Р·РґРµР»РµРЅРёСЏ РєР°РЅР°Р»РѕРІ LORA СЃРµС‚Рё. РЎРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµС‚СЃСЏ РїРѕ 1PPS РѕС‚ GPS РјРѕРґСѓР»СЏ
+	TIM2_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° Timer2 - С‚Р°Р№РјРµСЂ С„РѕСЂРјРёСЂСѓРµС‚ С‚Р°Р№РјР°СѓС‚ РґР»СЏ РїСЂРёРµРјР° РїРѕСЃС‹Р»РєРё РїРѕ usart2
+	TIM3_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° Timer3 - С‚Р°Р№РјРµСЂ С„РѕСЂРјРёСЂСѓРµС‚ С‚Р°Р№РјР°СѓС‚ РґР»СЏ РїСЂРёРµРјР° РїРѕСЃС‹Р»РєРё РїРѕ usart3
+	TIM4_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° Timer4 - С‚Р°Р№РјРµСЂ РёР·РјРµСЂСЏРµС‚ РїРµСЂРёРѕРґ СЃРёРіРЅР°Р»Р° 1PPS, РґР»СЏ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё LORA СЃРµС‚Рё РІ РѕС‚СЃСѓС‚СЃРІРёРё СЃРёРіРЅР°Р»Р° 1PPS РѕС‚ GPS РјРѕРґСѓР»СЏ
+	SPI1_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° SPI1
+	NVIC_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° РїСЂРµСЂС‹РІР°РЅРёР№
+	ADC1_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° РђР¦Рџ
+	EXTI_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° РІРЅРµС€РЅРµРіРѕ РїСЂРµСЂС‹РІР°РЅРёСЏ РЅР° PB12
+	DMA_Configuration();	   // РЅР°СЃС‚СЂРѕР№РєР° DMA РґР»СЏ I2C РґРёСЃРїР»РµСЏ
 
-	DelayMS(100);			// пауза для правильной инициализации дисплея
+	DelayMS(100); // РїР°СѓР·Р° РґР»СЏ РїСЂР°РІРёР»СЊРЅРѕР№ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё РґРёСЃРїР»РµСЏ
 
-	SSD1306_Init();  		// инициализация дисплея
+	SSD1306_Init(); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РґРёСЃРїР»РµСЏ
 
-//DelayMS(200);
-    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE); // включение прерывания по приему байта
-    USART_ITConfig(USART2, USART_IT_RXNE, ENABLE); // включение прерывания по приему байта
-    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE); // включение прерывания по приему байта
+	// DelayMS(200);
+	USART_ITConfig(USART1, USART_IT_RXNE, ENABLE); // РІРєР»СЋС‡РµРЅРёРµ РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р°
+	USART_ITConfig(USART2, USART_IT_RXNE, ENABLE); // РІРєР»СЋС‡РµРЅРёРµ РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р°
+	USART_ITConfig(USART3, USART_IT_RXNE, ENABLE); // РІРєР»СЋС‡РµРЅРёРµ РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р°
 
-	rprintfInit (Terminal); // инициализация printf (). Вывод в терминал
+	rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
 	printf("\n\r\n\r Power ON ! ");
 	printf("\n\r RESET! USART1\n\r");
 
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
 
@@ -976,52 +961,56 @@ OnVcc1();		// удерживаем 1 на линейных стабилизаторах
 
 	InitMeasVoltage();
 
-/*	SSD1306_GotoXY(0, 0);
-	printf(" %d", Vref[0]);
-	SSD1306_GotoXY(0, 10);
-	printf(" %d", Vref[1]);
-	SSD1306_GotoXY(0, 20);
-	printf(" %d", Vacc[2]);
-	SSD1306_GotoXY(0, 30);
-	printf(" %d", Vref[3]);
-	SSD1306_GotoXY(0, 40);
-	printf(" %d", Vref[4]);
-	SSD1306_GotoXY(0, 50);
-	printf(" %d", Vref[5]);
-	SSD1306_UpdateScreen();
+	/*	SSD1306_GotoXY(0, 0);
+		printf(" %d", Vref[0]);
+		SSD1306_GotoXY(0, 10);
+		printf(" %d", Vref[1]);
+		SSD1306_GotoXY(0, 20);
+		printf(" %d", Vacc[2]);
+		SSD1306_GotoXY(0, 30);
+		printf(" %d", Vref[3]);
+		SSD1306_GotoXY(0, 40);
+		printf(" %d", Vref[4]);
+		SSD1306_GotoXY(0, 50);
+		printf(" %d", Vref[5]);
+		SSD1306_UpdateScreen();
 
-//	STOP
+	//	STOP
 
-	DelayMS (4000);
-*/
+		DelayMS (4000);
+	*/
 
-	rprintfInit (OLED_font2); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font2); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 	SSD1306_GotoXY(3, 7);
 
-	for (j=0; j<1; j++) // 20 циклов измерения напряжений аккумулятора и Vcc
+	for (j = 0; j < 1; j++) // 20 С†РёРєР»РѕРІ РёР·РјРµСЂРµРЅРёСЏ РЅР°РїСЂСЏР¶РµРЅРёР№ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° Рё Vcc
 	{
 		MeasVoltage();
-		OffLED1();// красный
+		OffLED1(); // РєСЂР°СЃРЅС‹Р№
 
 		SSD1306_GotoXY(32, 0);
-		printf("%d.%02d V ", VaccAvg/1000, (VaccAvg%1000)/10 ); // показываем с точностью 10 мВ
+		printf("%d.%02d V ", VaccAvg / 1000, (VaccAvg % 1000) / 10); // РїРѕРєР°Р·С‹РІР°РµРј СЃ С‚РѕС‡РЅРѕСЃС‚СЊСЋ 10 РјР’
 
-		// батарейка
+		// Р±Р°С‚Р°СЂРµР№РєР°
 		u8 X_bat = 32;
 		u8 Y_bat = 21;
-		SSD1306_DrawRectangle(0+X_bat, 0+Y_bat, 59, 25, SSD1306_COLOR_WHITE );
-		SSD1306_DrawFilledRectangle(60+X_bat, 4+Y_bat, 2, 17, SSD1306_COLOR_WHITE );
+		SSD1306_DrawRectangle(0 + X_bat, 0 + Y_bat, 59, 25, SSD1306_COLOR_WHITE);
+		SSD1306_DrawFilledRectangle(60 + X_bat, 4 + Y_bat, 2, 17, SSD1306_COLOR_WHITE);
 
-		if (VaccAvg >= 3500)	SSD1306_DrawFilledRectangle(X_bat+3, 			Y_bat+3, 11, 19, SSD1306_COLOR_WHITE );
-		if (VaccAvg >= 3690)	SSD1306_DrawFilledRectangle(X_bat+3+14,		 	Y_bat+3, 11, 19, SSD1306_COLOR_WHITE );
-		if (VaccAvg >= 3780)	SSD1306_DrawFilledRectangle(X_bat+3+14+14, 		Y_bat+3, 11, 19, SSD1306_COLOR_WHITE );
-		if (VaccAvg >= 3850)	SSD1306_DrawFilledRectangle(X_bat+3+14+14+14, 	Y_bat+3, 11, 19, SSD1306_COLOR_WHITE );
+		if (VaccAvg >= 3500)
+			SSD1306_DrawFilledRectangle(X_bat + 3, Y_bat + 3, 11, 19, SSD1306_COLOR_WHITE);
+		if (VaccAvg >= 3690)
+			SSD1306_DrawFilledRectangle(X_bat + 3 + 14, Y_bat + 3, 11, 19, SSD1306_COLOR_WHITE);
+		if (VaccAvg >= 3780)
+			SSD1306_DrawFilledRectangle(X_bat + 3 + 14 + 14, Y_bat + 3, 11, 19, SSD1306_COLOR_WHITE);
+		if (VaccAvg >= 3850)
+			SSD1306_DrawFilledRectangle(X_bat + 3 + 14 + 14 + 14, Y_bat + 3, 11, 19, SSD1306_COLOR_WHITE);
 		SSD1306_UpdateScreen();
 	}
 
 	DelayMS(2000);
 
-	if (VaccAvg < VaccAttention) // сравниваем с порогом напряжения
+	if (VaccAvg < VaccAttention) // СЃСЂР°РІРЅРёРІР°РµРј СЃ РїРѕСЂРѕРіРѕРј РЅР°РїСЂСЏР¶РµРЅРёСЏ
 	{
 		OffLED0();
 		OnLED1();
@@ -1031,7 +1020,7 @@ OnVcc1();		// удерживаем 1 на линейных стабилизаторах
 		SSD1306_GotoXY(58, 27);
 		SSD1306_Puts("!", &Font_16x26, SSD1306_COLOR_WHITE);
 
-		rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+		rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 		SSD1306_GotoXY(4, 53);
 		printf("%d mV ", VaccAvg);
 
@@ -1039,779 +1028,767 @@ OnVcc1();		// удерживаем 1 на линейных стабилизаторах
 
 		DelayMS(4000);
 
-		OffVcc1();		// выключаем питание
+		OffVcc1(); // РІС‹РєР»СЋС‡Р°РµРј РїРёС‚Р°РЅРёРµ
 
-		STOP  // бесконечный цикл, ждем пока отпустят кнопку
+		STOP // Р±РµСЃРєРѕРЅРµС‡РЅС‹Р№ С†РёРєР», Р¶РґРµРј РїРѕРєР° РѕС‚РїСѓСЃС‚СЏС‚ РєРЅРѕРїРєСѓ
 	}
 
+	// SSD1306_DrawRectangle(0, 0, 127, 64, SSD1306_COLOR_WHITE );		// СЂР°РјРєР°
+	// OnLED0();
+	//	SSD1306_UpdateScreenDMA();
+	////OffLED0();
+	////OnLED1();
+	//// DMA end of transfer  Р—Р°РєРѕРЅС‡РёР»Р°СЃСЊ РїРµСЂРµРґР°С‡Р° РІ I2C РїРѕ DMA
+	// while ( DMA_GetFlagStatus(DMA1_FLAG_TC6) == 0  )
+	//{
+	// }
+	////{
+	////OffLED1();
+	//// Disable the DMA1 Channel 6
+	// DMA_Cmd(DMA1_Channel6, DISABLE);
+	//// Clear the DMA Transfer complete flag
+	// DMA_ClearFlag(DMA1_FLAG_TC6);
+	//
+	//// EV8_2: Wait until BTF is set before programming the STOP
+	// while ((I2C1->SR1 & 0x00004) != 0x000004);
+	////OnLED0();
+	//// Program the STOP
+	// I2C1->CR1 |= 0x0200 ; //CR1_STOP_Set;
+	//// Make sure that the STOP bit is cleared by Hardware
+	// while ((I2C1->CR1&0x200) == 0x200);
 
-//SSD1306_DrawRectangle(0, 0, 127, 64, SSD1306_COLOR_WHITE );		// рамка
-//OnLED0();
-//	SSD1306_UpdateScreenDMA();
-////OffLED0();
-////OnLED1();
-//// DMA end of transfer  Закончилась передача в I2C по DMA
-//while ( DMA_GetFlagStatus(DMA1_FLAG_TC6) == 0  )
-//{
-//}
-////{
-////OffLED1();
-//// Disable the DMA1 Channel 6
-//DMA_Cmd(DMA1_Channel6, DISABLE);
-//// Clear the DMA Transfer complete flag
-//DMA_ClearFlag(DMA1_FLAG_TC6);
-//
-//// EV8_2: Wait until BTF is set before programming the STOP
-//while ((I2C1->SR1 & 0x00004) != 0x000004);
-////OnLED0();
-//// Program the STOP
-//I2C1->CR1 |= 0x0200 ; //CR1_STOP_Set;
-//// Make sure that the STOP bit is cleared by Hardware
-//while ((I2C1->CR1&0x200) == 0x200);
+	// OffLED0();
+	// STOP
 
-//OffLED0();
-//STOP
+	// DelayMS(2000);
+	OffVcc1();	 // РІС‹РєР»СЋС‡Р°РµРј РїРёС‚Р°РЅРёРµ
+	DelayMS(10); // РїР°СѓР·Р° С‡С‚РѕР±С‹ СѓСЃРїРµР» РІС‹РєР»СЋС‡РёС‚СЊСЃСЏ
 
-	//DelayMS(2000);
-	OffVcc1();		// выключаем питание
-	DelayMS(10);	// пауза чтобы успел выключиться
-
-/*	for ( i=0; i<100; i=i+2 ) // анимация включения
-	{
-		SSD1306_DrawFilledRectangle(14, 40, i, 5, SSD1306_COLOR_WHITE ); 	// градусник
-		SSD1306_DrawRectangle(12, 38, 102, 9, SSD1306_COLOR_WHITE );		// рамка
-		SSD1306_DrawLine(13+20, 40, 13+20, 45 ,SSD1306_COLOR_BLACK);		// деления
-		SSD1306_DrawLine(13+21, 40, 13+21, 45 ,SSD1306_COLOR_BLACK);
-		SSD1306_DrawLine(13+40, 40, 13+40, 45 ,SSD1306_COLOR_BLACK);
-		SSD1306_DrawLine(13+41, 40, 13+41, 45 ,SSD1306_COLOR_BLACK);
-		SSD1306_DrawLine(13+60, 40, 13+60, 45 ,SSD1306_COLOR_BLACK);
-		SSD1306_DrawLine(13+61, 40, 13+61, 45 ,SSD1306_COLOR_BLACK);
-		SSD1306_DrawLine(13+80, 40, 13+80, 45 ,SSD1306_COLOR_BLACK);
-		SSD1306_DrawLine(13+81, 40, 13+81, 45 ,SSD1306_COLOR_BLACK);
-
-		SSD1306_UpdateScreen();
-		//DelayMS(1);
-	}*/
-//OffLED0();
-	OnVcc1();		// удерживаем 1 на линейных стабилизаторах
-
-	OnLED0(); 		// Вкл синий светодиод. Пошла загрузка
-
-	if ( GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_8) == 0 )  		// если кнопка SCREEN нажата во время включения питания
+	/*	for ( i=0; i<100; i=i+2 ) // Р°РЅРёРјР°С†РёСЏ РІРєР»СЋС‡РµРЅРёСЏ
 		{
-		ScreenMode = ReleaseMode; 	// сокращенный список экранов
-		}
+			SSD1306_DrawFilledRectangle(14, 40, i, 5, SSD1306_COLOR_WHITE ); 	// РіСЂР°РґСѓСЃРЅРёРє
+			SSD1306_DrawRectangle(12, 38, 102, 9, SSD1306_COLOR_WHITE );		// СЂР°РјРєР°
+			SSD1306_DrawLine(13+20, 40, 13+20, 45 ,SSD1306_COLOR_BLACK);		// РґРµР»РµРЅРёСЏ
+			SSD1306_DrawLine(13+21, 40, 13+21, 45 ,SSD1306_COLOR_BLACK);
+			SSD1306_DrawLine(13+40, 40, 13+40, 45 ,SSD1306_COLOR_BLACK);
+			SSD1306_DrawLine(13+41, 40, 13+41, 45 ,SSD1306_COLOR_BLACK);
+			SSD1306_DrawLine(13+60, 40, 13+60, 45 ,SSD1306_COLOR_BLACK);
+			SSD1306_DrawLine(13+61, 40, 13+61, 45 ,SSD1306_COLOR_BLACK);
+			SSD1306_DrawLine(13+80, 40, 13+80, 45 ,SSD1306_COLOR_BLACK);
+			SSD1306_DrawLine(13+81, 40, 13+81, 45 ,SSD1306_COLOR_BLACK);
 
+			SSD1306_UpdateScreen();
+			//DelayMS(1);
+		}*/
+	// OffLED0();
+	OnVcc1(); // СѓРґРµСЂР¶РёРІР°РµРј 1 РЅР° Р»РёРЅРµР№РЅС‹С… СЃС‚Р°Р±РёР»РёР·Р°С‚РѕСЂР°С…
+
+	OnLED0(); // Р’РєР» СЃРёРЅРёР№ СЃРІРµС‚РѕРґРёРѕРґ. РџРѕС€Р»Р° Р·Р°РіСЂСѓР·РєР°
+
+	if (GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_8) == 0) // РµСЃР»Рё РєРЅРѕРїРєР° SCREEN РЅР°Р¶Р°С‚Р° РІРѕ РІСЂРµРјСЏ РІРєР»СЋС‡РµРЅРёСЏ РїРёС‚Р°РЅРёСЏ
+	{
+		ScreenMode = ReleaseMode; // СЃРѕРєСЂР°С‰РµРЅРЅС‹Р№ СЃРїРёСЃРѕРє СЌРєСЂР°РЅРѕРІ
+	}
 
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
 	SSD1306_GotoXY(0, 0);
 	SSD1306_Puts("Batt check..  ", &Font_7x10, SSD1306_COLOR_WHITE);
 	SSD1306_UpdateScreen();
 
-//	SSD1306_GotoXY(0, 10);
-//	SSD1306_Puts("Off  RTC....  ", &Font_7x10, SSD1306_COLOR_WHITE);
-//	SSD1306_UpdateScreen();
+	//	SSD1306_GotoXY(0, 10);
+	//	SSD1306_Puts("Off  RTC....  ", &Font_7x10, SSD1306_COLOR_WHITE);
+	//	SSD1306_UpdateScreen();
 
-   // DelayMS(100);
-    SSD1306_Puts("OK", &Font_7x10, SSD1306_COLOR_WHITE);
-    SSD1306_UpdateScreen();
+	// DelayMS(100);
+	SSD1306_Puts("OK", &Font_7x10, SSD1306_COLOR_WHITE);
+	SSD1306_UpdateScreen();
 
-// ------------------------------ GPS -----------------------------
-	NRESET_on();  // включаем GPS
+	// ------------------------------ GPS -----------------------------
+	NRESET_on(); // РІРєР»СЋС‡Р°РµРј GPS
 
-	rprintfInit (Terminal); // инициализация printf (). Вывод в терминал
+	rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
 	printf("\n\r GPS power ON  ... OK");
 
 	SSD1306_GotoXY(0, 10);
 	SSD1306_Puts("GPS setup...  ", &Font_7x10, SSD1306_COLOR_WHITE);
 	SSD1306_UpdateScreen();
 
-	DelayMS(800); // пауза для загрузки GPS модуля
+	DelayMS(800); // РїР°СѓР·Р° РґР»СЏ Р·Р°РіСЂСѓР·РєРё GPS РјРѕРґСѓР»СЏ
 
-/////////////// test GPS boudrate ////////////////
-	ClearGPSBuffer();  				// очистка приемного буфера GPS
+	/////////////// test GPS boudrate ////////////////
+	ClearGPSBuffer(); // РѕС‡РёСЃС‚РєР° РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР° GPS
 
-	rprintfInit (GpsUsart);  		// переключаем вывод на USART3 - в модуль GPS
-	printf("$PMTK000*32\r\n\n"); 	// команда TEST , ответ должен быть $PMTK001,0,3*30\r\n
+	rprintfInit(GpsUsart);		 // РїРµСЂРµРєР»СЋС‡Р°РµРј РІС‹РІРѕРґ РЅР° USART3 - РІ РјРѕРґСѓР»СЊ GPS
+	printf("$PMTK000*32\r\n\n"); // РєРѕРјР°РЅРґР° TEST , РѕС‚РІРµС‚ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ $PMTK001,0,3*30\r\n
 
-	rprintfInit (Terminal); 		// инициализация printf (). Вывод в терминал
+	rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
 	printf("\n\r GPS TEST 9600 ...  \n\r");
-	DelayMS(200); 					// задержка на ответ от GPS модуля
+	DelayMS(200); // Р·Р°РґРµСЂР¶РєР° РЅР° РѕС‚РІРµС‚ РѕС‚ GPS РјРѕРґСѓР»СЏ
 
-//if ( triggerTIM3Interrupt == 1 ) 		// проверка  - пришла посылка от GPS модуля
-//{
-	for (i=0; i < 20; i++) 	// вывод буфера в терминал
-		{
-		if (GPSBuf[i] == '\0' || GPSBuf[i] == '\r' || GPSBuf[i] == '\n') break; 	// выводим только до первого 0 или \r в буфере
+	// if ( triggerTIM3Interrupt == 1 ) 		// РїСЂРѕРІРµСЂРєР°  - РїСЂРёС€Р»Р° РїРѕСЃС‹Р»РєР° РѕС‚ GPS РјРѕРґСѓР»СЏ
+	//{
+	for (i = 0; i < 20; i++) // РІС‹РІРѕРґ Р±СѓС„РµСЂР° РІ С‚РµСЂРјРёРЅР°Р»
+	{
+		if (GPSBuf[i] == '\0' || GPSBuf[i] == '\r' || GPSBuf[i] == '\n')
+			break; // РІС‹РІРѕРґРёРј С‚РѕР»СЊРєРѕ РґРѕ РїРµСЂРІРѕРіРѕ 0 РёР»Рё \r РІ Р±СѓС„РµСЂРµ
 		USART_SendByte(USART1, GPSBuf[i]);
-		}
+	}
 
-	if (GPSBuf[0] == '$' && GPSBuf[1] == 'P' && GPSBuf[2] == 'M' && GPSBuf[3] == 'T' && GPSBuf[4] == 'K' && GPSBuf[5] == '0'
-			&& GPSBuf[6] == '0' && GPSBuf[7] == '1' && GPSBuf[8] == ',' && GPSBuf[9] == '0' && GPSBuf[10] == ','
-					&& GPSBuf[11] == '3' && GPSBuf[12] == '*' && GPSBuf[13] == '3' && GPSBuf[14] == '0' ) // скорость 9600
-		{
-			printf("\tOK  ");
-//			printf("\n\r Set to 115200 ");
-//			rprintfInit (GpsUsart);  				// переключаем вывод на USART3 - в модуль GPS
-//			printf("$PMTK251,115200*1F\r\n\n"); 	// настройки скорости USART - 115200 бод
-//			//printf("$PMTK251,9600*17\r\n\n);	//	9600 бод
-//			DelayMS(100);
-		}
+	if (GPSBuf[0] == '$' && GPSBuf[1] == 'P' && GPSBuf[2] == 'M' && GPSBuf[3] == 'T' && GPSBuf[4] == 'K' && GPSBuf[5] == '0' && GPSBuf[6] == '0' && GPSBuf[7] == '1' && GPSBuf[8] == ',' && GPSBuf[9] == '0' && GPSBuf[10] == ',' && GPSBuf[11] == '3' && GPSBuf[12] == '*' && GPSBuf[13] == '3' && GPSBuf[14] == '0') // СЃРєРѕСЂРѕСЃС‚СЊ 9600
+	{
+		printf("\tOK  ");
+		//			printf("\n\r Set to 115200 ");
+		//			rprintfInit (GpsUsart);  				// РїРµСЂРµРєР»СЋС‡Р°РµРј РІС‹РІРѕРґ РЅР° USART3 - РІ РјРѕРґСѓР»СЊ GPS
+		//			printf("$PMTK251,115200*1F\r\n\n"); 	// РЅР°СЃС‚СЂРѕР№РєРё СЃРєРѕСЂРѕСЃС‚Рё USART - 115200 Р±РѕРґ
+		//			//printf("$PMTK251,9600*17\r\n\n);	//	9600 Р±РѕРґ
+		//			DelayMS(100);
+	}
 	else
 		printf("\tNO! ");
 
-	printf("\n\r Set to 115200 ");          // принудительное переключение, проверка проходит не всегда
-	rprintfInit (GpsUsart);  				// переключаем вывод на USART3 - в модуль GPS
-	printf("$PMTK251,115200*1F\r\n\n"); 	// настройки скорости USART - 115200 бод
+	printf("\n\r Set to 115200 ");		// РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕРµ РїРµСЂРµРєР»СЋС‡РµРЅРёРµ, РїСЂРѕРІРµСЂРєР° РїСЂРѕС…РѕРґРёС‚ РЅРµ РІСЃРµРіРґР°
+	rprintfInit(GpsUsart);				// РїРµСЂРµРєР»СЋС‡Р°РµРј РІС‹РІРѕРґ РЅР° USART3 - РІ РјРѕРґСѓР»СЊ GPS
+	printf("$PMTK251,115200*1F\r\n\n"); // РЅР°СЃС‚СЂРѕР№РєРё СЃРєРѕСЂРѕСЃС‚Рё USART - 115200 Р±РѕРґ
 	DelayMS(100);
 
-	rprintfInit (Terminal); 		// инициализация printf (). Вывод в терминал
+	rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
 	printf("\n\r GPS TEST 115200..\n\r ");
 
-	USART3_Configuration115200();  	// переключаем скорость USART3 на 115200
+	USART3_Configuration115200(); // РїРµСЂРµРєР»СЋС‡Р°РµРј СЃРєРѕСЂРѕСЃС‚СЊ USART3 РЅР° 115200
 
-	ClearGPSBuffer();  				// очистка приемного буфера GPS
+	ClearGPSBuffer(); // РѕС‡РёСЃС‚РєР° РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР° GPS
 
-	rprintfInit (GpsUsart);  		// переключаем вывод на USART3 - в модуль GPS
-	printf("$PMTK000*32\r\n\n"); 	// команда TEST , ответ должен быть $PMTK001,0,3*30\r\n
+	rprintfInit(GpsUsart);		 // РїРµСЂРµРєР»СЋС‡Р°РµРј РІС‹РІРѕРґ РЅР° USART3 - РІ РјРѕРґСѓР»СЊ GPS
+	printf("$PMTK000*32\r\n\n"); // РєРѕРјР°РЅРґР° TEST , РѕС‚РІРµС‚ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ $PMTK001,0,3*30\r\n
 
-	DelayMS(200); 					// задержка на ответ от GPS модуля
-	rprintfInit (Terminal); 		// инициализация printf (). Вывод в терминал
+	DelayMS(200);		   // Р·Р°РґРµСЂР¶РєР° РЅР° РѕС‚РІРµС‚ РѕС‚ GPS РјРѕРґСѓР»СЏ
+	rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
 
-	for (i=0; i < 20; i++) 	// вывод буфера в терминал
-		{
-		if (GPSBuf[i] == '\0' || GPSBuf[i] == '\r' || GPSBuf[i] == '\n') break; 	// выводим только до первого 0 в буфере
+	for (i = 0; i < 20; i++) // РІС‹РІРѕРґ Р±СѓС„РµСЂР° РІ С‚РµСЂРјРёРЅР°Р»
+	{
+		if (GPSBuf[i] == '\0' || GPSBuf[i] == '\r' || GPSBuf[i] == '\n')
+			break; // РІС‹РІРѕРґРёРј С‚РѕР»СЊРєРѕ РґРѕ РїРµСЂРІРѕРіРѕ 0 РІ Р±СѓС„РµСЂРµ
 		USART_SendByte(USART1, GPSBuf[i]);
-		}
+	}
 
-	if (GPSBuf[0] == '$' && GPSBuf[1] == 'P' && GPSBuf[2] == 'M' && GPSBuf[3] == 'T' && GPSBuf[4] == 'K' && GPSBuf[5] == '0'
-			&& GPSBuf[6] == '0' && GPSBuf[7] == '1' && GPSBuf[8] == ',' && GPSBuf[9] == '0' && GPSBuf[10] == ','
-					&& GPSBuf[11] == '3' && GPSBuf[12] == '*' && GPSBuf[13] == '3' && GPSBuf[14] == '0' ) // скорость 115200
+	if (GPSBuf[0] == '$' && GPSBuf[1] == 'P' && GPSBuf[2] == 'M' && GPSBuf[3] == 'T' && GPSBuf[4] == 'K' && GPSBuf[5] == '0' && GPSBuf[6] == '0' && GPSBuf[7] == '1' && GPSBuf[8] == ',' && GPSBuf[9] == '0' && GPSBuf[10] == ',' && GPSBuf[11] == '3' && GPSBuf[12] == '*' && GPSBuf[13] == '3' && GPSBuf[14] == '0') // СЃРєРѕСЂРѕСЃС‚СЊ 115200
 		printf("\tOK  ");
 	else
 		printf("\tNO! ");
 
-	//	triggerTIM3Interrupt = 0; 	// сбрасываем флаг наличия данных в буфере
+	//	triggerTIM3Interrupt = 0; 	// СЃР±СЂР°СЃС‹РІР°РµРј С„Р»Р°Рі РЅР°Р»РёС‡РёСЏ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ
 	//}
 
-	ClearGPSBuffer();  				// очистка приемного буфера GPS
+	ClearGPSBuffer(); // РѕС‡РёСЃС‚РєР° РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР° GPS
 
-    printf("\n\r GPS setup    ...\t");
+	printf("\n\r GPS setup    ...\t");
 
+	rprintfInit(GpsUsart); // РїРµСЂРµРєР»СЋС‡Р°РµРј РІС‹РІРѕРґ РЅР° USART3 - РІ РјРѕРґСѓР»СЊ GPS
 
+	printf("$PMTK300,1000,0,0,0,0*1C\r\n\n"); // РЅР°СЃС‚СЂРѕР№РєР° РЅР° РїРµСЂРёРѕРґ РїРѕСЃС‹Р»РѕРє РѕС‚ GPS 1 СЃРµРє
+	// printf("$PMTK300,10000,0,0,0,0*2C"); 	// РЅР°СЃС‚СЂРѕР№РєР° РЅР° РїРµСЂРёРѕРґ РїРѕСЃС‹Р»РѕРє РѕС‚ GPS 10 СЃРµРє
+	DelayMS(50); // РЅСѓР¶РЅР° РїР°СѓР·Р° РґР»СЏ РѕС‚РІРµС‚Р° РЅР° РїСЂРµРґС‹РґСѓС‰СѓСЋ РєРѕРјР°РЅРґСѓ todo РґРѕР±Р°РІРёС‚СЊ РїСЂРѕРІРµСЂРєСѓ РѕС‚РІРµС‚Р°
 
-    rprintfInit ( GpsUsart );  				// переключаем вывод на USART3 - в модуль GPS
+	// printf("$PMTK353,1,0*36\r\n\n"); 	// С‚РѕР»СЊРєРѕ GPS
+	// printf("$PMTK353,0,1*36\r\n\n"); 	// С‚РѕР»СЊРєРѕ GLONASS
+	printf("$PMTK353,1,1*37\r\n\n"); // GPS Рё GLONASS
+	DelayMS(70);					 // РЅСѓР¶РЅР° РїР°СѓР·Р° РґР»СЏ РѕС‚РІРµС‚Р° РЅР° РїСЂРµРґС‹РґСѓС‰СѓСЋ РєРѕРјР°РЅРґСѓ todo РґРѕР±Р°РІРёС‚СЊ РїСЂРѕРІРµСЂРєСѓ РѕС‚РІРµС‚Р°
 
-    printf("$PMTK300,1000,0,0,0,0*1C\r\n\n"); 	// настройка на период посылок от GPS 1 сек
-    //printf("$PMTK300,10000,0,0,0,0*2C"); 	// настройка на период посылок от GPS 10 сек
-    DelayMS(50);			// нужна пауза для ответа на предыдущую команду todo добавить проверку ответа
+	printf("$PMTK314,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0*28\r\n\n"); // РЅР°СЃС‚СЂРѕР№РєРё РІС‹РІРѕРґРёРјРѕР№ РёРЅС„РѕСЂРјР°С†РёРё -  GGA, GSA, GSV, ZDA
+	// printf("$PMTK314,-1,*04 	// СЃР±СЂРѕСЃ РЅР°СЃС‚СЂРѕРµРє РЅР° Р·Р°РІРѕРґСЃРєРёРµ
 
-    //printf("$PMTK353,1,0*36\r\n\n"); 	// только GPS
-    //printf("$PMTK353,0,1*36\r\n\n"); 	// только GLONASS
-    printf("$PMTK353,1,1*37\r\n\n"); 	// GPS и GLONASS
-    DelayMS(70);			// нужна пауза для ответа на предыдущую команду todo добавить проверку ответа
+	DelayMS(70); // РЅСѓР¶РЅР° РїР°СѓР·Р° РґР»СЏ РѕС‚РІРµС‚Р° РЅР° РїСЂРµРґС‹РґСѓС‰СѓСЋ РєРѕРјР°РЅРґСѓ todo РґРѕР±Р°РІРёС‚СЊ РїСЂРѕРІРµСЂРєСѓ РѕС‚РІРµС‚Р°
 
-    printf("$PMTK314,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0*28\r\n\n"); // настройки выводимой информации -  GGA, GSA, GSV, ZDA
-    // printf("$PMTK314,-1,*04 	// сброс настроек на заводские
-
-    DelayMS(70);			// нужна пауза для ответа на предыдущую команду todo добавить проверку ответа
-
-    rprintfInit ( Terminal );	// вывод в терминал
-    printf("OK \r\n");
+	rprintfInit(Terminal); // РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+	printf("OK \r\n");
 	SSD1306_Puts("OK ", &Font_7x10, SSD1306_COLOR_WHITE);
 	SSD1306_UpdateScreen();
-    DelayMS(500);
+	DelayMS(500);
 
-
-/*    printf("\r\n START test 1PPS: \r\n");
-for (;;) // тест измерения периода 1PPS
-{
-	rprintfInit ( Terminal );	// вывод в терминал
-
-	if ( flag_1PPS_Update == 1)
+	/*    printf("\r\n START test 1PPS: \r\n");
+	for (;;) // С‚РµСЃС‚ РёР·РјРµСЂРµРЅРёСЏ РїРµСЂРёРѕРґР° 1PPS
 	{
-		trigger_1PPS_Update = 0;
+		rprintfInit ( Terminal );	// РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
 
-		printf("Count: %d\tTIM4: %d \r\n", counter_TIM4_fix, TIM4_fix);
-	}
+		if ( flag_1PPS_Update == 1)
+		{
+			trigger_1PPS_Update = 0;
 
-	if ( flag_1PPS_timeout == 1)
-	{
-		flag_1PPS_timeout = 0;
+			printf("Count: %d\tTIM4: %d \r\n", counter_TIM4_fix, TIM4_fix);
+		}
 
-		printf("1PPS timeout ! \r\n");
-	}
+		if ( flag_1PPS_timeout == 1)
+		{
+			flag_1PPS_timeout = 0;
 
-	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+			printf("1PPS timeout ! \r\n");
+		}
 
-	SSD1306_GotoXY(0, 0);
-	printf ("count: %d ", counter_TIM4_fix);
-	SSD1306_GotoXY(0, 10);
-	printf ("TIM4 : %d ", TIM4_fix);
+		SSD1306_Fill(SSD1306_COLOR_BLACK);
+		rprintfInit (OLED_font1); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
-	SSD1306_UpdateScreen();
+		SSD1306_GotoXY(0, 0);
+		printf ("count: %d ", counter_TIM4_fix);
+		SSD1306_GotoXY(0, 10);
+		printf ("TIM4 : %d ", TIM4_fix);
 
-} // STOP HERE*/
-//////////////////////////////////////////
+		SSD1306_UpdateScreen();
 
-// ---------------- BLE -------------------------------
-    rprintfInit ( Terminal );	// вывод в терминал
-    printf(" BLE setup     ...");
-    SSD1306_GotoXY(0, 20);
+	} // STOP HERE*/
+	//////////////////////////////////////////
+
+	// ---------------- BLE -------------------------------
+	rprintfInit(Terminal); // РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+	printf(" BLE setup     ...");
+	SSD1306_GotoXY(0, 20);
 	SSD1306_Puts("BLE setup...  ", &Font_7x10, SSD1306_COLOR_WHITE);
 	SSD1306_UpdateScreen();
 
-    OnResetBLE();	// сброс
-    DelayMS(50);
-    OffResetBLE(); 	// включение BLE модуля
-    DelayMS(500);
+	OnResetBLE(); // СЃР±СЂРѕСЃ
+	DelayMS(50);
+	OffResetBLE(); // РІРєР»СЋС‡РµРЅРёРµ BLE РјРѕРґСѓР»СЏ
+	DelayMS(500);
 
-
-    ClearBLEBuffer();		// очистка приемного буфера
+	ClearBLEBuffer(); // РѕС‡РёСЃС‚РєР° РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР°
 
 	DelayMS(20);
-	rprintfInit ( BleUsart ); // вывод в USART BLE модуля
+	rprintfInit(BleUsart); // РІС‹РІРѕРґ РІ USART BLE РјРѕРґСѓР»СЏ
 
-    printf("AT+BAUD8");		// настройка скорости UART интерфейса BLE модуля на 115200. BAUD4-9600
-    DelayMS(1);
-    USART2_SendByte(0x0D); 	// \r\n
-    USART2_SendByte(0x0A); 	//
+	printf("AT+BAUD8"); // РЅР°СЃС‚СЂРѕР№РєР° СЃРєРѕСЂРѕСЃС‚Рё UART РёРЅС‚РµСЂС„РµР№СЃР° BLE РјРѕРґСѓР»СЏ РЅР° 115200. BAUD4-9600
+	DelayMS(1);
+	USART2_SendByte(0x0D); // \r\n
+	USART2_SendByte(0x0A); //
 
-    DelayMS(200);
-    for (i=0; i < BufferUSART2Size; i++)
-		{
-		if (BufferUSART2RX[i] == '\0') break;
+	DelayMS(200);
+	for (i = 0; i < BufferUSART2Size; i++)
+	{
+		if (BufferUSART2RX[i] == '\0')
+			break;
 		USART_SendByte(USART1, BufferUSART2RX[i]); // terminal
-		}
-//STOP
-    USART1_SendByte(0x0D); 	// \r\n
-    USART1_SendByte(0x0A); 	//
+	}
+	// STOP
+	USART1_SendByte(0x0D); // \r\n
+	USART1_SendByte(0x0A); //
 
-    DelayMS(20);
-    USART2_Configuration115200();  // переключаем скорость USART2 на 115200
+	DelayMS(20);
+	USART2_Configuration115200(); // РїРµСЂРµРєР»СЋС‡Р°РµРј СЃРєРѕСЂРѕСЃС‚СЊ USART2 РЅР° 115200
 
-    ClearBLEBuffer();		// очистка приемного буфера
+	ClearBLEBuffer(); // РѕС‡РёСЃС‚РєР° РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР°
 
-    DelayMS(20);
-    printf("AT+NAMEtrack%d\r\n\n", NumberDev);		// изменение названия модуля
-    DelayMS(100);
+	DelayMS(20);
+	printf("AT+NAMEtrack%d\r\n\n", NumberDev); // РёР·РјРµРЅРµРЅРёРµ РЅР°Р·РІР°РЅРёСЏ РјРѕРґСѓР»СЏ
+	DelayMS(100);
 
-    for (i=0; i < BufferUSART2Size; i++)
-		{
-		if (BufferUSART2RX[i] == '\0') break;
+	for (i = 0; i < BufferUSART2Size; i++)
+	{
+		if (BufferUSART2RX[i] == '\0')
+			break;
 		USART_SendByte(USART1, BufferUSART2RX[i]); // terminal
-		}
+	}
 
-    SSD1306_Puts("OK ", &Font_7x10, SSD1306_COLOR_WHITE);
+	SSD1306_Puts("OK ", &Font_7x10, SSD1306_COLOR_WHITE);
 	SSD1306_UpdateScreen();
-    rprintfInit ( Terminal );	// вывод в терминал
-    printf(" BLE setup   ...\tOK\r\n");
-//STOP
-//    if (BufferUSART2RX[0] == 'O' && BufferUSART2RX[1] == 'K')
-//    {
-//        rprintfInit ( Terminal );	// вывод в терминал
-//        printf("OK \r\n");
-//    	SSD1306_Puts("OK ", &Font_7x10, SSD1306_COLOR_WHITE);
-//    	SSD1306_UpdateScreen();
-//        DelayMS(500);
-//    }
-//    else
-//    {
-//		rprintfInit ( Terminal );	// вывод в терминал
-//		printf("ER! \r\n");
-//		SSD1306_Puts("ER! ", &Font_7x10, SSD1306_COLOR_WHITE);
-//		SSD1306_UpdateScreen();
-//		DelayMS(5000);
-//    }
+	rprintfInit(Terminal); // РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+	printf(" BLE setup   ...\tOK\r\n");
+	// STOP
+	//     if (BufferUSART2RX[0] == 'O' && BufferUSART2RX[1] == 'K')
+	//     {
+	//         rprintfInit ( Terminal );	// РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+	//         printf("OK \r\n");
+	//     	SSD1306_Puts("OK ", &Font_7x10, SSD1306_COLOR_WHITE);
+	//     	SSD1306_UpdateScreen();
+	//         DelayMS(500);
+	//     }
+	//     else
+	//     {
+	//		rprintfInit ( Terminal );	// РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+	//		printf("ER! \r\n");
+	//		SSD1306_Puts("ER! ", &Font_7x10, SSD1306_COLOR_WHITE);
+	//		SSD1306_UpdateScreen();
+	//		DelayMS(5000);
+	//     }
 
-//    for (;;) // test SEND to BLE USART
-//    	{
-//			temp1 ++;
-//
-//	//    	DelayMS(5000);
-//	//      rprintfInit(BleUsart);
-//	//    	printf(" BLE test #%d \n\r", temp1);
-//
-//			if (triggerUSART1Interrupt == 1 ) // пришел байт от терминала
-//			{
-//				DelayMS(100); // пауза, ждем всю посылку
-//
-//				for (i=0; i < BufferUSART1Size; i++) // команды от терминала к BLE
-//					{
-//					if (BufferUSART1RX[i] == '\0') break;
-//					USART_SendByte(USART1, BufferUSART1RX[i]); // terminal эхо
-//					USART_SendByte(USART2, BufferUSART1RX[i]); // to BLE
-//					}
-//
-//				counterUSART1Buffer = 0;
-//				triggerUSART1Interrupt = 0;
-//			}
-//
-//			if ( triggerTIM2Interrupt == 1 ) 	// проверка  - пришла посылка от BLE модуля
-//			{
-//			OnLED0();
-//			//CplLED0();
-//				for (i=0; i < BufferUSART2Size; i++)
-//					{
-//					if (BufferUSART2RX[i] == '\0') break;
-//					USART_SendByte(USART1, BufferUSART2RX[i]); // terminal
-//					//USART_SendByte(USART2, BufferUSART2RX[i]); // back
-//					}
-//
-//				triggerTIM2Interrupt = 0; 	// сбрасываем флаг наличия данных в буфере
-//			OffLED0();
-//			}
-//
-//    	}
+	//    for (;;) // test SEND to BLE USART
+	//    	{
+	//			temp1 ++;
+	//
+	//	//    	DelayMS(5000);
+	//	//      rprintfInit(BleUsart);
+	//	//    	printf(" BLE test #%d \n\r", temp1);
+	//
+	//			if (triggerUSART1Interrupt == 1 ) // РїСЂРёС€РµР» Р±Р°Р№С‚ РѕС‚ С‚РµСЂРјРёРЅР°Р»Р°
+	//			{
+	//				DelayMS(100); // РїР°СѓР·Р°, Р¶РґРµРј РІСЃСЋ РїРѕСЃС‹Р»РєСѓ
+	//
+	//				for (i=0; i < BufferUSART1Size; i++) // РєРѕРјР°РЅРґС‹ РѕС‚ С‚РµСЂРјРёРЅР°Р»Р° Рє BLE
+	//					{
+	//					if (BufferUSART1RX[i] == '\0') break;
+	//					USART_SendByte(USART1, BufferUSART1RX[i]); // terminal СЌС…Рѕ
+	//					USART_SendByte(USART2, BufferUSART1RX[i]); // to BLE
+	//					}
+	//
+	//				counterUSART1Buffer = 0;
+	//				triggerUSART1Interrupt = 0;
+	//			}
+	//
+	//			if ( triggerTIM2Interrupt == 1 ) 	// РїСЂРѕРІРµСЂРєР°  - РїСЂРёС€Р»Р° РїРѕСЃС‹Р»РєР° РѕС‚ BLE РјРѕРґСѓР»СЏ
+	//			{
+	//			OnLED0();
+	//			//CplLED0();
+	//				for (i=0; i < BufferUSART2Size; i++)
+	//					{
+	//					if (BufferUSART2RX[i] == '\0') break;
+	//					USART_SendByte(USART1, BufferUSART2RX[i]); // terminal
+	//					//USART_SendByte(USART2, BufferUSART2RX[i]); // back
+	//					}
+	//
+	//				triggerTIM2Interrupt = 0; 	// СЃР±СЂР°СЃС‹РІР°РµРј С„Р»Р°Рі РЅР°Р»РёС‡РёСЏ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ
+	//			OffLED0();
+	//			}
+	//
+	//    	}
 
+	// --------------------------------------------- LORA -------------------------------
+	// OffResetLORA 	();			//  RESET LORA РІ 1 Р’РєР»СЋС‡РµРЅРёРµ РјРѕРґСѓР»СЏ
 
-// --------------------------------------------- LORA -------------------------------
-    //OffResetLORA 	();			//  RESET LORA в 1 Включение модуля
-
-    rprintfInit ( Terminal );	// вывод в терминал
-    printf(" LORA setup  ...\t");
-    SSD1306_GotoXY(0, 30);
+	rprintfInit(Terminal); // РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+	printf(" LORA setup  ...\t");
+	SSD1306_GotoXY(0, 30);
 	SSD1306_Puts("LORA setup..  ", &Font_7x10, SSD1306_COLOR_WHITE);
 	SSD1306_UpdateScreen();
 
-	Radio = RadioDriverInit();  // инициализация структуры , определение функций
-	Radio->Init( );				// инициализация радиоинтерфейса, начальные настройки , частота и тп
+	Radio = RadioDriverInit(); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ СЃС‚СЂСѓРєС‚СѓСЂС‹ , РѕРїСЂРµРґРµР»РµРЅРёРµ С„СѓРЅРєС†РёР№
+	Radio->Init();			   // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ СЂР°РґРёРѕРёРЅС‚РµСЂС„РµР№СЃР°, РЅР°С‡Р°Р»СЊРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё , С‡Р°СЃС‚РѕС‚Р° Рё С‚Рї
 
-	SX1276LoRaSetPAOutput( RFLR_PACONFIG_PASELECT_PABOOST ); // включаем выход PABoost
-	//SX1276LoRaSetPa20dBm( true );
-	SX1276LoRaSetRFFrequency(434000000);	// Частота, Гц
-	SX1276LoRaSetRFPower( RFPower );		// Мощность, дБм
-	//SX1276LoRaSetSpreadingFactor ( 11 );
-	SX1276LoRaSetPreambleLength( 8 ); 		// размер преамбулы 6-65535 8+14 = 12 символов преамбула (как по стандарту LoRA)
+	SX1276LoRaSetPAOutput(RFLR_PACONFIG_PASELECT_PABOOST); // РІРєР»СЋС‡Р°РµРј РІС‹С…РѕРґ PABoost
+	// SX1276LoRaSetPa20dBm( true );
+	SX1276LoRaSetRFFrequency(434000000); // Р§Р°СЃС‚РѕС‚Р°, Р“С†
+	SX1276LoRaSetRFPower(RFPower);		 // РњРѕС‰РЅРѕСЃС‚СЊ, РґР‘Рј
+	// SX1276LoRaSetSpreadingFactor ( 11 );
+	SX1276LoRaSetPreambleLength(8); // СЂР°Р·РјРµСЂ РїСЂРµР°РјР±СѓР»С‹ 6-65535 8+14 = 12 СЃРёРјРІРѕР»РѕРІ РїСЂРµР°РјР±СѓР»Р° (РєР°Рє РїРѕ СЃС‚Р°РЅРґР°СЂС‚Сѓ LoRA)
 
-//	for (i=0; i<256; i++)					// очистка буфера передачи LORA трансивера
-//	{
-//		LORAbuffer[i]= 0;
-//	}
+	//	for (i=0; i<256; i++)					// РѕС‡РёСЃС‚РєР° Р±СѓС„РµСЂР° РїРµСЂРµРґР°С‡Рё LORA С‚СЂР°РЅСЃРёРІРµСЂР°
+	//	{
+	//		LORAbuffer[i]= 0;
+	//	}
+
+	SX1276Write(REG_LR_MODEMCONFIG3, 0b00000100); // todo ALC on
+	SX1276Write(REG_LR_LNA, 0b00000000);
+
+	DelayMS(100);
+	rprintfInit(Terminal); // РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+	printf("OK \r\n");
+	SSD1306_Puts("OK ", &Font_7x10, SSD1306_COLOR_WHITE);
+	SSD1306_UpdateScreen();
+	DelayMS(500);
+
+	// OnLED0();
+	rprintfInit(Terminal); // РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+						   /*   Radio->Process( );
+							  Radio->Process( );
+							  Radio->Process( );
+							  //printf("RFLRState = %d\n\r", RFLRState);
+							  printf("SetTxPacket!\n\r");
+					   
+						  OnLED0();
+						  Radio->SetTxPacket( LORAbuffer, 255 ); // РїРµСЂРµРґР°С‡Р° РїР°РєРµС‚Р°
+						  */
+						   // for (;;)
+	//	 Radio->Process( );
+	// STOP
+	for (i = 0; i < 10; i++) // Р·Р°РїРѕР»РЅСЏРµРј РјР°СЃСЃРёРІ PER - РЅРµРѕРїСЂРµРґРµР»РµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ
+	{
+		PER[i] = 65535;
+	}
+
+	////////////////////////////////////////////////////////// TX test /////////////////////////////////////////////////////////////////
+	/*	for (i=0; i<256; i++)
+		{
+			LORAbuffer[i]= 1;
+		}
+
+		for(;;) // Transmit LOOP
+			{
+				//CplLED0();
+				Radio->Process( );
+				if (RFLRState != 0)
+					//OnLED0();
+					//printf("RFLRState = %d\n\r", RFLRState);
+				if (RFLRState == RFLR_STATE_TX_DONE)
+				{
+					OffLED0();
+
+					DelayMS(3000);
+
+					temp1 ++ ;
+					for (i=0; i<256; i++)					// РѕС‡РёСЃС‚РєР° Р±СѓС„РµСЂР° РїСЂРёРµРјР° LORA С‚СЂР°РЅСЃРёРІРµСЂР°
+					{
+						LORAbuffer[i]= temp1;
+					}
+
+	//				i = i + 3;
+	//				if (i >=18 )
+	//					i=2;
+	//
+	//				countPacket ++;
+	//				Power = i;
+	//				LORAbuffer [0] = countPacket>>8;
+	//				LORAbuffer [1] = countPacket;
+	//				LORAbuffer [2] = 0;
+	//				LORAbuffer [3] = Power;
+	//				LORAbuffer [4] = 0;
+
+	//				SX1276LoRaSetRFPower( Power );				// РњРѕС‰РЅРѕСЃС‚СЊ, РґР‘Рј
+
+	//				printf("TX#%03d, power = %02d dBm\n\r", countPacket, SX1276LoRaGetRFPower() );
+					Radio->SetTxPacket( LORAbuffer, 255 ); 	// РїРµСЂРµРґР°С‡Р° РїР°РєРµС‚Р°
+					OnLED0();
+				}
+			}//STOP
+	*/
+	////////////////////////////////////////////////////////// RX test ///////////////////////////////////////////////////////////////////////////////////////
+
+	/*
+
+	SX1276LoRaSetPreambleLength( 28 ); // 6-65535
+
+
+	for (i=2; i<256; i++)
+	{
+		LORAbuffer2[i]= i;
+	}
 
 	SX1276Write ( REG_LR_MODEMCONFIG3, 0b00000100 ); // todo ALC on
 	SX1276Write ( REG_LR_LNA, 0b00000000 );
 
-	DelayMS(100);
-    rprintfInit ( Terminal );	// вывод в терминал
-    printf("OK \r\n");
-	SSD1306_Puts("OK ", &Font_7x10, SSD1306_COLOR_WHITE);
-	SSD1306_UpdateScreen();
-    DelayMS(500);
-
-//OnLED0();
-    rprintfInit ( Terminal );	// вывод в терминал
- /*   Radio->Process( );
-    Radio->Process( );
-    Radio->Process( );
-    //printf("RFLRState = %d\n\r", RFLRState);
-    printf("SetTxPacket!\n\r");
-
-OnLED0();
-Radio->SetTxPacket( LORAbuffer, 255 ); // передача пакета
-*/
-//for (;;)
-//	 Radio->Process( );
-//STOP
-    for (i = 0; i< 10; i++)  // заполняем массив PER - неопределенные значения
-    {
-    	PER [i] = 65535;
-    }
-
-////////////////////////////////////////////////////////// TX test /////////////////////////////////////////////////////////////////
-/*	for (i=0; i<256; i++)
-	{
-		LORAbuffer[i]= 1;
-	}
-
-	for(;;) // Transmit LOOP
-		{
-			//CplLED0();
-			Radio->Process( );
-			if (RFLRState != 0)
-				//OnLED0();
-				//printf("RFLRState = %d\n\r", RFLRState);
-			if (RFLRState == RFLR_STATE_TX_DONE)
-			{
-				OffLED0();
-
-				DelayMS(3000);
-
-				temp1 ++ ;
-				for (i=0; i<256; i++)					// очистка буфера приема LORA трансивера
-				{
-					LORAbuffer[i]= temp1;
-				}
-
-//				i = i + 3;
-//				if (i >=18 )
-//					i=2;
-//
-//				countPacket ++;
-//				Power = i;
-//				LORAbuffer [0] = countPacket>>8;
-//				LORAbuffer [1] = countPacket;
-//				LORAbuffer [2] = 0;
-//				LORAbuffer [3] = Power;
-//				LORAbuffer [4] = 0;
-
-//				SX1276LoRaSetRFPower( Power );				// Мощность, дБм
-
-//				printf("TX#%03d, power = %02d dBm\n\r", countPacket, SX1276LoRaGetRFPower() );
-				Radio->SetTxPacket( LORAbuffer, 255 ); 	// передача пакета
-				OnLED0();
-			}
-		}//STOP
-*/
-////////////////////////////////////////////////////////// RX test ///////////////////////////////////////////////////////////////////////////////////////
-
-/*
-
-SX1276LoRaSetPreambleLength( 28 ); // 6-65535
+	 Radio -> StartRx();
+	// SX1276LoRaSetRFState( RFLR_STATE_RX_INIT );
+	// Radio -> Process();
+	 printf(" StartRx \n\r");
 
 
-for (i=2; i<256; i++)
-{
-	LORAbuffer2[i]= i;
-}
+	 printf(" 0x26: 0x%02X  \n\r", LoraReadReg(0x26) );
+	 printf(" 0x0C: 0x%02X  \n\r", LoraReadReg(0x0C) );
 
-SX1276Write ( REG_LR_MODEMCONFIG3, 0b00000100 ); // todo ALC on
-SX1276Write ( REG_LR_LNA, 0b00000000 );
-
- Radio -> StartRx();
-// SX1276LoRaSetRFState( RFLR_STATE_RX_INIT );
-// Radio -> Process();
- printf(" StartRx \n\r");
-
-
- printf(" 0x26: 0x%02X  \n\r", LoraReadReg(0x26) );
- printf(" 0x0C: 0x%02X  \n\r", LoraReadReg(0x0C) );
-
-// OnTest();
- trigger_PER = 0;
-/////////////////////////////
- while (1) // Receive
- {
- 	 rprintfInit ( Terminal );	// вывод в терминал
-     DelayMS(1);
-	 switch ( Radio -> Process())
+	// OnTest();
+	 trigger_PER = 0;
+	/////////////////////////////
+	 while (1) // Receive
 	 {
-	 case RF_BUSY:
-		 break;
-	 case RF_RX_TIMEOUT:
-		 printf(" RF_RX_TIMEOUT \n\r");
-		 break;
-	 case RF_RX_DONE:
-		 Radio -> GetRxPacket( LORAbuffer, (uint16_t*)&BufferSize );
-
-		 countOK ++; // счетчик общего количества пакетов
-
-		 if (CRCerror == 1) // ошибка CRC
+		 rprintfInit ( Terminal );	// РІС‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+		 DelayMS(1);
+		 switch ( Radio -> Process())
 		 {
-			 CRCerror = 0;
-			 printf(" CRC ER! " );
+		 case RF_BUSY:
+			 break;
+		 case RF_RX_TIMEOUT:
+			 printf(" RF_RX_TIMEOUT \n\r");
+			 break;
+		 case RF_RX_DONE:
+			 Radio -> GetRxPacket( LORAbuffer, (uint16_t*)&BufferSize );
 
-			 countERR ++;
+			 countOK ++; // СЃС‡РµС‚С‡РёРє РѕР±С‰РµРіРѕ РєРѕР»РёС‡РµСЃС‚РІР° РїР°РєРµС‚РѕРІ
 
-//				 if (trigger_PER == 0)
-//					 {
-//					 countERR = 0;
-//					 countOK = 0;
-//					 PER = 0;
-//					 trigger_PER = 1;
-//					 }
-		 }
+			 if (CRCerror == 1) // РѕС€РёР±РєР° CRC
+			 {
+				 CRCerror = 0;
+				 printf(" CRC ER! " );
 
-		 PER = (countERR * 10000 / countOK) ;
-		 PER1 = PER / 100;
-		 PER2 = PER % 100;
+				 countERR ++;
 
-//			 printf(" 0x%02X", LoraReadReg(0x14) );
-//			 printf("%02X ", LoraReadReg(0x15) );
-//			 printf(" 0x%02X", LoraReadReg(0x16) );
-//			 printf("%02X  ", LoraReadReg(0x17) );
-//			 printf("Freq Err=0x%02X", LoraReadReg(0x28) );
-//			 printf("%02X", LoraReadReg(0x29) );
-//			 printf("%02X ", LoraReadReg(0x2A) );
+	//				 if (trigger_PER == 0)
+	//					 {
+	//					 countERR = 0;
+	//					 countOK = 0;
+	//					 PER = 0;
+	//					 trigger_PER = 1;
+	//					 }
+			 }
 
-		 FREQ_ERROR =( (LoraReadReg(0x28) << 28) + (LoraReadReg(0x29) << 20) + (LoraReadReg(0x2A) << 12) ) ;
+			 PER = (countERR * 10000 / countOK) ;
+			 PER1 = PER / 100;
+			 PER2 = PER % 100;
 
-		// FreqError =  ((FREQ_ERROR * (2^24) ) / 32e6 ) * (BW / 500) ; // расчет ошибки по частоте
-		 FreqError = (FREQ_ERROR/4096) / 3.815;
+	//			 printf(" 0x%02X", LoraReadReg(0x14) );
+	//			 printf("%02X ", LoraReadReg(0x15) );
+	//			 printf(" 0x%02X", LoraReadReg(0x16) );
+	//			 printf("%02X  ", LoraReadReg(0x17) );
+	//			 printf("Freq Err=0x%02X", LoraReadReg(0x28) );
+	//			 printf("%02X", LoraReadReg(0x29) );
+	//			 printf("%02X ", LoraReadReg(0x2A) );
+
+			 FREQ_ERROR =( (LoraReadReg(0x28) << 28) + (LoraReadReg(0x29) << 20) + (LoraReadReg(0x2A) << 12) ) ;
+
+			// FreqError =  ((FREQ_ERROR * (2^24) ) / 32e6 ) * (BW / 500) ; // СЂР°СЃС‡РµС‚ РѕС€РёР±РєРё РїРѕ С‡Р°СЃС‚РѕС‚Рµ
+			 FreqError = (FREQ_ERROR/4096) / 3.815;
 
 
-		// printf(" 0x10: 0x%02X ", LoraReadReg(0x10) );
-		// printf(" 0x0D: 0x%02X  \n\r", LoraReadReg(0x0D) );
-		 printf(" TX#%03d  P:%02d dBm ", LORAbuffer[0], LORAbuffer[1]);
-		// printf("\n\r RSSI: %d dBm", (s32)(SX1276LoRaReadRssi()) );
-		 printf(" RSSI:%d dBm ", (s32)(SX1276LoRaGetPacketRssi()) );
-		 //printf("\n\r Preamble:  %d\n\r",  SX1276LoRaGetPreambleLength () );
-		// printf(" Gain: %d ", SX1276GetPacketRxGain() );
-		 printf(" SNR:%d dB ", SX1276GetPacketSnr() );
+			// printf(" 0x10: 0x%02X ", LoraReadReg(0x10) );
+			// printf(" 0x0D: 0x%02X  \n\r", LoraReadReg(0x0D) );
+			 printf(" TX#%03d  P:%02d dBm ", LORAbuffer[0], LORAbuffer[1]);
+			// printf("\n\r RSSI: %d dBm", (s32)(SX1276LoRaReadRssi()) );
+			 printf(" RSSI:%d dBm ", (s32)(SX1276LoRaGetPacketRssi()) );
+			 //printf("\n\r Preamble:  %d\n\r",  SX1276LoRaGetPreambleLength () );
+			// printf(" Gain: %d ", SX1276GetPacketRxGain() );
+			 printf(" SNR:%d dB ", SX1276GetPacketSnr() );
 
-		// printf(" Preamble: %d ",  SX1276LoRaGetPreambleLength () );
-		// printf(" NbTrigPeaks: %d \n\r",  SX1276LoRaGetNbTrigPeaks () );
+			// printf(" Preamble: %d ",  SX1276LoRaGetPreambleLength () );
+			// printf(" NbTrigPeaks: %d \n\r",  SX1276LoRaGetNbTrigPeaks () );
 
-		 printf(" PER:%02d.%02d%% ", PER1, PER2 );
-		 printf(" %d Hz", (s32)FreqError );
-		// printf(" err=%d summ=%d ", countERR, countOK );
+			 printf(" PER:%02d.%02d%% ", PER1, PER2 );
+			 printf(" %d Hz", (s32)FreqError );
+			// printf(" err=%d summ=%d ", countERR, countOK );
 
-		 countPacket = LORAbuffer[0];
-		// printf("\n\r new=%d old=%d old+1=%d  ", countPacket, countPacketOld, (u8)(countPacketOld+1) );
-		 if ( countPacket != (u8)(countPacketOld+1) )
-		 	 {
-			 printf(" c.ER! " );
+			 countPacket = LORAbuffer[0];
+			// printf("\n\r new=%d old=%d old+1=%d  ", countPacket, countPacketOld, (u8)(countPacketOld+1) );
+			 if ( countPacket != (u8)(countPacketOld+1) )
+				 {
+				 printf(" c.ER! " );
+				 countPacketOld = LORAbuffer[0];
+				 }
+			 else
+				 printf(" c.OK! " );
+
+			 printf(" Data." );
 			 countPacketOld = LORAbuffer[0];
-		 	 }
-		 else
-			 printf(" c.OK! " );
 
-		 printf(" Data." );
-		 countPacketOld = LORAbuffer[0];
+			 LORAbuffer[0]=0; LORAbuffer[1]=0;
+			 LORAbuffer2[0]=0; LORAbuffer2[1]=0;
+			 if( strncmp( ( const char* )LORAbuffer, ( const char* )LORAbuffer2, 255 ) == 0 ) // СЃСЂР°РІРЅРёРІР°РµРј СЃС‚СЂРѕРєРё
+				 {
+				 printf("OK! \n\r" );
+				 }
+			 else
+				 {
+				 printf("ER! \n\r" );
+				 }
 
-		 LORAbuffer[0]=0; LORAbuffer[1]=0;
-		 LORAbuffer2[0]=0; LORAbuffer2[1]=0;
-		 if( strncmp( ( const char* )LORAbuffer, ( const char* )LORAbuffer2, 255 ) == 0 ) // сравниваем строки
-			 {
-			 printf("OK! \n\r" );
-			 }
-		 else
-			 {
-			 printf("ER! \n\r" );
-			 }
-
-		 break;
+			 break;
+		 }
+		 Display9	();
 	 }
-	 Display9	();
- }
-*/
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	*/
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	DelayMS(400);
 
-	ClearGPSBuffer();			// очистка приемного буфера GPS
-	triggerTIM3Interrupt = 0; 	// сбрасываем флаг наличия данных в буфере
-//OffLED1();
+	ClearGPSBuffer();		  // РѕС‡РёСЃС‚РєР° РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР° GPS
+	triggerTIM3Interrupt = 0; // СЃР±СЂР°СЃС‹РІР°РµРј С„Р»Р°Рі РЅР°Р»РёС‡РёСЏ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ
+							  // OffLED1();
 
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	SSD1306_DrawRectangle(0, 0, 127, 64, SSD1306_COLOR_WHITE );		// рамка
-//OnLED1();
+	SSD1306_DrawRectangle(0, 0, 127, 64, SSD1306_COLOR_WHITE); // СЂР°РјРєР°
+															   // OnLED1();
 	SSD1306_UpdateScreenDMA();
-	counterLcdOff = LcdOffTimeout; // заводим таймер
+	counterLcdOff = LcdOffTimeout; // Р·Р°РІРѕРґРёРј С‚Р°Р№РјРµСЂ
 
-OffLED0();
+	OffLED0();
 }
 
-// ----------- обрабатываем нажатие кнопки POWER OFF / SCREEN
-void ScanKeyPowerOff 	(void)
+// ----------- РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РЅР°Р¶Р°С‚РёРµ РєРЅРѕРїРєРё POWER OFF / SCREEN
+void ScanKeyPowerOff(void)
 {
-		if ( GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_8) == 0 )  		// кнопка нажата
+	if (GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_8) == 0) // РєРЅРѕРїРєР° РЅР°Р¶Р°С‚Р°
+	{
+		DelayMS(10);									   // Р·Р°РґРµСЂР¶РєР° РїСЂРѕС‚РёРІ РґСЂРµР±РµР·РіР°
+		if (GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_8) == 0) // РїСЂРѕРІРµСЂРєР° РµС‰Рµ СЂР°Р·, РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ Р±С‹Р»Рѕ РЅР°Р¶Р°С‚РёРµ
 		{
-			DelayMS(10);											// задержка против дребезга
-			if ( GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_8) == 0 ) 	// проверка еще раз, действительно было нажатие
+			if (trigger1 == 0) // С‚СЂРёРіРіРµСЂ РґР»СЏ РѕРґРЅРѕРєСЂР°С‚РЅРѕРіРѕ РЅР°Р¶Р°С‚РёСЏ
 			{
-				if(trigger1 == 0) 									// триггер для однократного нажатия
+				trigger1 = 1;
+
+				if (counterLcdOff == 0) // СЌРєСЂР°РЅ РІС‹РєР»СЋС‡РµРЅ
 				{
-					trigger1 = 1;
-
-					if (counterLcdOff == 0) // экран выключен
-					{
-						counterLcdOff = LcdOffTimeout; // заводим таймер
-						// включаем экран
-						SSD1306_ON ();
-						SSD1306_UpdateScreenDMA();	  // запуск нового обновления экрана из видеобуфера
-
-					}
-					else	// экран включен
-					{
-						counterLcdOff = LcdOffTimeout; // заводим таймер
-
-						screen ++;
-						if (screen > 15)
-							screen = 1;
-					}
+					counterLcdOff = LcdOffTimeout; // Р·Р°РІРѕРґРёРј С‚Р°Р№РјРµСЂ
+					// РІРєР»СЋС‡Р°РµРј СЌРєСЂР°РЅ
+					SSD1306_ON();
+					SSD1306_UpdateScreenDMA(); // Р·Р°РїСѓСЃРє РЅРѕРІРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ СЌРєСЂР°РЅР° РёР· РІРёРґРµРѕР±СѓС„РµСЂР°
 				}
-				else
+				else // СЌРєСЂР°РЅ РІРєР»СЋС‡РµРЅ
 				{
-					counterPowerOff -- ;	// счетчик задержки выключения питания
-					if (counterPowerOff == 0)
-					{
-						OffVcc1(); 			// выключаем питание
-					}
+					counterLcdOff = LcdOffTimeout; // Р·Р°РІРѕРґРёРј С‚Р°Р№РјРµСЂ
 
+					screen++;
+					if (screen > 15)
+						screen = 1;
 				}
-
-
+			}
+			else
+			{
+				counterPowerOff--; // СЃС‡РµС‚С‡РёРє Р·Р°РґРµСЂР¶РєРё РІС‹РєР»СЋС‡РµРЅРёСЏ РїРёС‚Р°РЅРёСЏ
+				if (counterPowerOff == 0)
+				{
+					OffVcc1(); // РІС‹РєР»СЋС‡Р°РµРј РїРёС‚Р°РЅРёРµ
+				}
 			}
 		}
-		else 									// кнопка отпущена
-		{
-			trigger1 = 0; 						// сброс триггера однократного нажатия
-			counterPowerOff = PowerOffTimeout; 	// задержка на выключение питания примерно 3 сек
-		}
+	}
+	else // РєРЅРѕРїРєР° РѕС‚РїСѓС‰РµРЅР°
+	{
+		trigger1 = 0;					   // СЃР±СЂРѕСЃ С‚СЂРёРіРіРµСЂР° РѕРґРЅРѕРєСЂР°С‚РЅРѕРіРѕ РЅР°Р¶Р°С‚РёСЏ
+		counterPowerOff = PowerOffTimeout; // Р·Р°РґРµСЂР¶РєР° РЅР° РІС‹РєР»СЋС‡РµРЅРёРµ РїРёС‚Р°РЅРёСЏ РїСЂРёРјРµСЂРЅРѕ 3 СЃРµРє
+	}
 }
 
-// ----------- обрабатываем нажатие кнопки SOS
-void ScanKeySOS 		(void)
+// ----------- РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РЅР°Р¶Р°С‚РёРµ РєРЅРѕРїРєРё SOS
+void ScanKeySOS(void)
 {
-	if ( GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_15) == 0 )  		// кнопка нажата
+	if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_15) == 0) // РєРЅРѕРїРєР° РЅР°Р¶Р°С‚Р°
 	{
-		DelayMS(10);											// задержка против дребезга
-		if ( GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_15) == 0 ) 	// проверка еще раз, действительно было нажатие
+		DelayMS(10);										// Р·Р°РґРµСЂР¶РєР° РїСЂРѕС‚РёРІ РґСЂРµР±РµР·РіР°
+		if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_15) == 0) // РїСЂРѕРІРµСЂРєР° РµС‰Рµ СЂР°Р·, РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ Р±С‹Р»Рѕ РЅР°Р¶Р°С‚РёРµ
 		{
-			if(trigger2 == 0) 									// триггер для однократного нажатия
+			if (trigger2 == 0) // С‚СЂРёРіРіРµСЂ РґР»СЏ РѕРґРЅРѕРєСЂР°С‚РЅРѕРіРѕ РЅР°Р¶Р°С‚РёСЏ
 			{
 				trigger2 = 1;
-
-
 			}
 		}
 	}
-	else 														// кнопка отпущена
+	else // РєРЅРѕРїРєР° РѕС‚РїСѓС‰РµРЅР°
 	{
-		trigger2 = 0; 											// сброс триггера однократного нажатия
+		trigger2 = 0; // СЃР±СЂРѕСЃ С‚СЂРёРіРіРµСЂР° РѕРґРЅРѕРєСЂР°С‚РЅРѕРіРѕ РЅР°Р¶Р°С‚РёСЏ
 	}
-
 }
 
-// ----------- Получаем выборку АЦП1
-u16  GetSamplesADC1		(void) // выборка АЦП
+// ----------- РџРѕР»СѓС‡Р°РµРј РІС‹Р±РѕСЂРєСѓ РђР¦Рџ1
+u16 GetSamplesADC1(void) // РІС‹Р±РѕСЂРєР° РђР¦Рџ
 {
-	while(ADC_GetFlagStatus( ADC1, ADC_FLAG_EOC) == RESET ); // ждем флаг конца преобразования
-	ADC_ClearFlag( ADC1, ADC_FLAG_EOC );		// сбрасываем флаг
-	return ( ADC_GetConversionValue(ADC1) );
+	while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
+		;							   // Р¶РґРµРј С„Р»Р°Рі РєРѕРЅС†Р° РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёСЏ
+	ADC_ClearFlag(ADC1, ADC_FLAG_EOC); // СЃР±СЂР°СЃС‹РІР°РµРј С„Р»Р°Рі
+	return (ADC_GetConversionValue(ADC1));
 }
 
-
-void InitMeasVoltage		(void)
+void InitMeasVoltage(void)
 {
-	u16 ii;	//счетчик
+	u16 ii; // СЃС‡РµС‚С‡РёРє
 
-// костыль, без этого первое измерение adcIntRef не корректное  = 4095
-	ADC_RegularChannelConfig(ADC1, ADC_Channel_17, 1, ADC_SampleTime_239Cycles5 ); // подключили ко входу АЦП внутренний источник опорного напряжения 1.2 В
-	ADC_SoftwareStartConvCmd(ADC1, ENABLE);								// start ONE conversion
-	while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);				// wait end of conversion
-	adcIntRef = ADC_GetConversionValue(ADC1)  ;	// код АЦП, соответствующий напряжению на входе 1.2 В при текущем опорном напряжении АЦП (оно же напряжение питания)
+	// РєРѕСЃС‚С‹Р»СЊ, Р±РµР· СЌС‚РѕРіРѕ РїРµСЂРІРѕРµ РёР·РјРµСЂРµРЅРёРµ adcIntRef РЅРµ РєРѕСЂСЂРµРєС‚РЅРѕРµ  = 4095
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_17, 1, ADC_SampleTime_239Cycles5); // РїРѕРґРєР»СЋС‡РёР»Рё РєРѕ РІС…РѕРґСѓ РђР¦Рџ РІРЅСѓС‚СЂРµРЅРЅРёР№ РёСЃС‚РѕС‡РЅРёРє РѕРїРѕСЂРЅРѕРіРѕ РЅР°РїСЂСЏР¶РµРЅРёСЏ 1.2 Р’
+	ADC_SoftwareStartConvCmd(ADC1, ENABLE);										  // start ONE conversion
+	while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
+		;									  // wait end of conversion
+	adcIntRef = ADC_GetConversionValue(ADC1); // РєРѕРґ РђР¦Рџ, СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёР№ РЅР°РїСЂСЏР¶РµРЅРёСЋ РЅР° РІС…РѕРґРµ 1.2 Р’ РїСЂРё С‚РµРєСѓС‰РµРј РѕРїРѕСЂРЅРѕРј РЅР°РїСЂСЏР¶РµРЅРёРё РђР¦Рџ (РѕРЅРѕ Р¶Рµ РЅР°РїСЂСЏР¶РµРЅРёРµ РїРёС‚Р°РЅРёСЏ)
 
-// Измеряем внутреннее опорное напряжение 1.2 В todo настроить измерение группы каналов
-	ADC_RegularChannelConfig(ADC1, ADC_Channel_17, 1, ADC_SampleTime_239Cycles5 ); // подключили ко входу АЦП внутренний источник опорного напряжения 1.2 В
+	// РР·РјРµСЂСЏРµРј РІРЅСѓС‚СЂРµРЅРЅРµРµ РѕРїРѕСЂРЅРѕРµ РЅР°РїСЂСЏР¶РµРЅРёРµ 1.2 Р’ todo РЅР°СЃС‚СЂРѕРёС‚СЊ РёР·РјРµСЂРµРЅРёРµ РіСЂСѓРїРїС‹ РєР°РЅР°Р»РѕРІ
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_17, 1, ADC_SampleTime_239Cycles5); // РїРѕРґРєР»СЋС‡РёР»Рё РєРѕ РІС…РѕРґСѓ РђР¦Рџ РІРЅСѓС‚СЂРµРЅРЅРёР№ РёСЃС‚РѕС‡РЅРёРє РѕРїРѕСЂРЅРѕРіРѕ РЅР°РїСЂСЏР¶РµРЅРёСЏ 1.2 Р’
 
-	ADC_SoftwareStartConvCmd(ADC1, ENABLE);								// start ONE conversion
-	while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);				// wait end of conversion
+	ADC_SoftwareStartConvCmd(ADC1, ENABLE); // start ONE conversion
+	while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
+		; // wait end of conversion
 
-	adcIntRef = ADC_GetConversionValue(ADC1)  ;	// код АЦП, соответствующий напряжению на входе 1.2 В при текущем опорном напряжении АЦП (оно же напряжение питания)
+	adcIntRef = ADC_GetConversionValue(ADC1); // РєРѕРґ РђР¦Рџ, СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёР№ РЅР°РїСЂСЏР¶РµРЅРёСЋ РЅР° РІС…РѕРґРµ 1.2 Р’ РїСЂРё С‚РµРєСѓС‰РµРј РѕРїРѕСЂРЅРѕРј РЅР°РїСЂСЏР¶РµРЅРёРё РђР¦Рџ (РѕРЅРѕ Р¶Рµ РЅР°РїСЂСЏР¶РµРЅРёРµ РїРёС‚Р°РЅРёСЏ)
 
-// Измеряем напряжение аккумулятора
-	OnDivGND1();  // делитель аккумулятора на земле
-	ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_239Cycles5 ); // Вход 0 - напряжение аккумулятора через делитель
+	// РР·РјРµСЂСЏРµРј РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°
+	OnDivGND1();																 // РґРµР»РёС‚РµР»СЊ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РЅР° Р·РµРјР»Рµ
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_239Cycles5); // Р’С…РѕРґ 0 - РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° С‡РµСЂРµР· РґРµР»РёС‚РµР»СЊ
 
-	ADC_SoftwareStartConvCmd(ADC1, ENABLE);								// start ONE conversion
-	while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);				// wait end of conversion
+	ADC_SoftwareStartConvCmd(ADC1, ENABLE); // start ONE conversion
+	while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
+		; // wait end of conversion
 
-	adc1 = ADC_GetConversionValue(ADC1);								// get value
-	OffDivGND1();  // делитель аккумулятора в воздухе
+	adc1 = ADC_GetConversionValue(ADC1); // get value
+	OffDivGND1();						 // РґРµР»РёС‚РµР»СЊ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РІ РІРѕР·РґСѓС…Рµ
 
-// вычисление напряжений
-	Vacc1 = ( 4030 * 1200 * adc1 / adcIntRef ) / 1000;		// 4030/1000 - с учетом делителя напряжения
+	// РІС‹С‡РёСЃР»РµРЅРёРµ РЅР°РїСЂСЏР¶РµРЅРёР№
+	Vacc1 = (4030 * 1200 * adc1 / adcIntRef) / 1000; // 4030/1000 - СЃ СѓС‡РµС‚РѕРј РґРµР»РёС‚РµР»СЏ РЅР°РїСЂСЏР¶РµРЅРёСЏ
 
-	Vref1 = ( 4095 * 1200 / adcIntRef );
+	Vref1 = (4095 * 1200 / adcIntRef);
 
-	for (ii=0; ii<Average1; ii++) // заполнение массива измеренными значениями
+	for (ii = 0; ii < Average1; ii++) // Р·Р°РїРѕР»РЅРµРЅРёРµ РјР°СЃСЃРёРІР° РёР·РјРµСЂРµРЅРЅС‹РјРё Р·РЅР°С‡РµРЅРёСЏРјРё
 	{
 		Vacc[ii] = Vacc1;
 		Vref[ii] = Vref1;
 	}
 
 	Vref[4] = adcIntRef;
-	Vref[5] = adc1 ;
+	Vref[5] = adc1;
 }
 
-
-// ----------- Измерение напряжений аккумулятора и батареи
-void MeasVoltage		(void)
+// ----------- РР·РјРµСЂРµРЅРёРµ РЅР°РїСЂСЏР¶РµРЅРёР№ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° Рё Р±Р°С‚Р°СЂРµРё
+void MeasVoltage(void)
 {
-	u16 ii;	//счетчик
-// Измеряем внутреннее опорное напряжение 1.2 В todo настроить измерение группы каналов
-		ADC_RegularChannelConfig(ADC1, ADC_Channel_17, 1, ADC_SampleTime_239Cycles5 ); // подключили ко входу АЦП внутренний источник опорного напряжения 1.2 В
-		ADC_SoftwareStartConvCmd(ADC1, ENABLE);								// start ONE conversion
-		while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);				// wait end of conversion
-		adcIntRef = ADC_GetConversionValue(ADC1)  ;	// код АЦП, соответствующий напряжению на входе 1.2 В при текущем опорном напряжении АЦП (оно же напряжение питания)
+	u16 ii; // СЃС‡РµС‚С‡РёРє
+	// РР·РјРµСЂСЏРµРј РІРЅСѓС‚СЂРµРЅРЅРµРµ РѕРїРѕСЂРЅРѕРµ РЅР°РїСЂСЏР¶РµРЅРёРµ 1.2 Р’ todo РЅР°СЃС‚СЂРѕРёС‚СЊ РёР·РјРµСЂРµРЅРёРµ РіСЂСѓРїРїС‹ РєР°РЅР°Р»РѕРІ
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_17, 1, ADC_SampleTime_239Cycles5); // РїРѕРґРєР»СЋС‡РёР»Рё РєРѕ РІС…РѕРґСѓ РђР¦Рџ РІРЅСѓС‚СЂРµРЅРЅРёР№ РёСЃС‚РѕС‡РЅРёРє РѕРїРѕСЂРЅРѕРіРѕ РЅР°РїСЂСЏР¶РµРЅРёСЏ 1.2 Р’
+	ADC_SoftwareStartConvCmd(ADC1, ENABLE);										  // start ONE conversion
+	while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
+		;									  // wait end of conversion
+	adcIntRef = ADC_GetConversionValue(ADC1); // РєРѕРґ РђР¦Рџ, СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёР№ РЅР°РїСЂСЏР¶РµРЅРёСЋ РЅР° РІС…РѕРґРµ 1.2 Р’ РїСЂРё С‚РµРєСѓС‰РµРј РѕРїРѕСЂРЅРѕРј РЅР°РїСЂСЏР¶РµРЅРёРё РђР¦Рџ (РѕРЅРѕ Р¶Рµ РЅР°РїСЂСЏР¶РµРЅРёРµ РїРёС‚Р°РЅРёСЏ)
 
-// Измеряем напряжение аккумулятора
-		OnDivGND1();  // делитель аккумулятора на земле
-		ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_239Cycles5 ); // Вход 0 - напряжение аккумулятора через делитель
-		ADC_SoftwareStartConvCmd(ADC1, ENABLE);								// start ONE conversion
-		while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);				// wait end of conversion
-		adc1 = ADC_GetConversionValue(ADC1)  ;								// get value
-		OffDivGND1();  // делитель аккумулятора в воздухе
+	// РР·РјРµСЂСЏРµРј РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°
+	OnDivGND1();																 // РґРµР»РёС‚РµР»СЊ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РЅР° Р·РµРјР»Рµ
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_239Cycles5); // Р’С…РѕРґ 0 - РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° С‡РµСЂРµР· РґРµР»РёС‚РµР»СЊ
+	ADC_SoftwareStartConvCmd(ADC1, ENABLE);										 // start ONE conversion
+	while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
+		;								 // wait end of conversion
+	adc1 = ADC_GetConversionValue(ADC1); // get value
+	OffDivGND1();						 // РґРµР»РёС‚РµР»СЊ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РІ РІРѕР·РґСѓС…Рµ
 
-// вычисление напряжений
-		Vacc1 = ( 4030 * 1200 * adc1 / adcIntRef ) / 1000;		// 4030/1000 - с учетом делителя напряжения
-		Vref1 = ( 4095 * 1200 / adcIntRef );
-// усреднение скользящим средним
-		for (ii=Average1-1; ii>=1; ii--) // сдвиг окна
+	// РІС‹С‡РёСЃР»РµРЅРёРµ РЅР°РїСЂСЏР¶РµРЅРёР№
+	Vacc1 = (4030 * 1200 * adc1 / adcIntRef) / 1000; // 4030/1000 - СЃ СѓС‡РµС‚РѕРј РґРµР»РёС‚РµР»СЏ РЅР°РїСЂСЏР¶РµРЅРёСЏ
+	Vref1 = (4095 * 1200 / adcIntRef);
+	// СѓСЃСЂРµРґРЅРµРЅРёРµ СЃРєРѕР»СЊР·СЏС‰РёРј СЃСЂРµРґРЅРёРј
+	for (ii = Average1 - 1; ii >= 1; ii--) // СЃРґРІРёРі РѕРєРЅР°
+	{
+		Vacc[ii] = Vacc[ii - 1];
+		Vref[ii] = Vref[ii - 1];
+	}
+	Vacc[0] = Vacc1; // С‚РµРєСѓС‰РµРµ Р·РЅР°С‡РµРЅРёРµ - РІ РЅСѓР»РµРІРѕР№ СЌР»РµРјРµРЅС‚ РјР°СЃСЃРёРІР°
+	Vref[0] = Vref1;
+
+	VaccSumm = 0;
+	VrefSumm = 0;
+	for (ii = 0; ii < Average1; ii++) // РЅР°РєР°РїР»РёРІР°РµРј СЃСѓРјРјСѓ
+	{
+		VaccSumm += Vacc[ii];
+		VrefSumm += Vref[ii];
+	}
+	VaccAvg = VaccSumm / Average1; // РІС‹С‡РёСЃР»СЏРµРј СЃСЂРµРґРЅРµРµ
+	VrefAvg = VrefSumm / Average1;
+
+	VrefDev = VrefAvg * 100 / 3300 - 100; // РѕС‚РєР»РѕРЅРµРЅРёРµ РѕС‚ РЅРѕРјРёРЅР°Р»Р° РІ %
+	VaccDev = VaccAvg * 100 / 3700 - 100; // todo РґРѕСЂР°Р±РѕС‚Р°С‚СЊ 2.7V = 0%, 3,7V = 100%
+
+	if ((GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 0) && (ChargeTrigger == 0)) // РЅР°С‡Р°Р»СЃСЏ Р·Р°СЂСЏРґ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°
+	{
+		ChargeTrigger = 1;
+		OnLED1(); // РѕРґРЅРѕРєСЂР°С‚РЅРѕРµ РІРєР»СЋС‡РµРЅРёРµ РєСЂР°СЃРЅРѕРіРѕ СЃРІРµС‚РѕРґРёРѕРґР°
+	}
+	if ((GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 1) && (ChargeTrigger == 1)) // Р·Р°СЂСЏРґ Р·Р°РєРѕРЅС‡РёР»СЃСЏ
+	{
+		ChargeTrigger = 0;
+		OffLED1(); // РѕРґРЅРѕРєСЂР°С‚РЅРѕРµ РІС‹РєР»СЋС‡РµРЅРёРµ РєСЂР°СЃРЅРѕРіРѕ СЃРІРµС‚РѕРґРёРѕРґР°
+	}
+
+	//		if ( flag_1PPS_AVG_OK == 1 ) // РµСЃР»Рё СЃРїСѓС‚РЅРёРєРё РІРёРґРЅС‹ Рё РІСЂРµРјСЏ РѕРїСЂРµРґРµР»РµРЅРѕ
+	//		{
+	//			if ( triggerTimeStartLogVcc == 0)
+	//				{
+	//				triggerTimeStartLogVcc = 1;
+	//				TimeStartLogVcc = GPSTimeSec + 1;	// Р·Р°РїРѕРјРёРЅР°РµРј РІСЂРµРјСЏ СЃС‚Р°СЂС‚Р° Р·Р°РїРёСЃРё Р»РѕРіР° РЅР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°
+	//				}
+	//		}
+
+	// Р·Р°РїРёСЃСЊ РІ Р»РѕРі
+	// TimeLogVcc = SecRTC - TimeStartLogVcc ;  // РІСЂРµРјСЏ, РїСЂРѕС€РµРґС€РµРµ СЃ РЅР°С‡Р°Р»Р° Р·Р°РїРёСЃРё Р»РѕРіР°
+	TimeLogVcc = timer1s; // РІСЂРµРјСЏ, РїСЂРѕС€РµРґС€РµРµ РѕС‚ РІРєР»СЋС‡РµРЅРёСЏ РїСЂРёР±РѕСЂР°
+
+	if (TimeLogVcc != SecRTCold)
+	{
+		SecRTCold = TimeLogVcc;
+
+		if (TimeLogVcc % 600 == 0) // РІСЂРµРјСЏ РґРµР»РёС‚СЃСЏ РЅР° 10 РјРёРЅ Р±РµР· РѕСЃС‚Р°С‚РєР°
 		{
-			Vacc[ii] = Vacc[ii-1];
-			Vref[ii] = Vref[ii-1];
+			VaccLog[counterVaccLog] = (VaccAvg - 3000) / 25; // РїРµСЂРµСЃС‡РµС‚ РІ РґРµР»РµРЅРёСЏ РіСЂР°С„РёРєР° ( РІСЃРµРіРѕ 48 РґРµР»РµРЅРёР№ РїРѕ 25 РјР’ )
+			counterVaccLog++;
+			if (counterVaccLog > 127)
+				counterVaccLog = 127;
 		}
-		Vacc[0] = Vacc1;	// текущее значение - в нулевой элемент массива
-		Vref[0] = Vref1;
-
-		VaccSumm = 0;
-		VrefSumm = 0;
-		for (ii=0; ii<Average1; ii++) //накапливаем сумму
-		{
-			VaccSumm += Vacc[ii];
-			VrefSumm += Vref[ii];
-		}
-		VaccAvg = VaccSumm / Average1; // вычисляем среднее
-		VrefAvg = VrefSumm / Average1;
-
-		VrefDev = VrefAvg * 100 / 3300 - 100; // отклонение от номинала в %
-		VaccDev = VaccAvg * 100 / 3700 - 100; // todo доработать 2.7V = 0%, 3,7V = 100%
-
-		if ( (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 0) && (ChargeTrigger == 0) )  		// начался заряд аккумулятора
-		{
-			ChargeTrigger = 1;
-			OnLED1();				// однократное включение красного светодиода
-		}
-		if ( (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 1) && (ChargeTrigger == 1) )  		// заряд закончился
-		{
-			ChargeTrigger = 0;
-			OffLED1();				// однократное выключение красного светодиода
-		}
-
-//		if ( flag_1PPS_AVG_OK == 1 ) // если спутники видны и время определено
-//		{
-//			if ( triggerTimeStartLogVcc == 0)
-//				{
-//				triggerTimeStartLogVcc = 1;
-//				TimeStartLogVcc = GPSTimeSec + 1;	// запоминаем время старта записи лога напряжения аккумулятора
-//				}
-//		}
-
-		// запись в лог
-		//TimeLogVcc = SecRTC - TimeStartLogVcc ;  // время, прошедшее с начала записи лога
-		TimeLogVcc = timer1s;	// время, прошедшее от включения прибора
-
-		if ( TimeLogVcc != SecRTCold)
-		{
-			SecRTCold = TimeLogVcc ;
-
-			if ( TimeLogVcc % 600 == 0 ) // время делится на 10 мин без остатка
-			{
-				VaccLog [counterVaccLog] = (VaccAvg - 3000) / 25;	// пересчет в деления графика ( всего 48 делений по 25 мВ )
-				counterVaccLog ++ ;
-				if (counterVaccLog > 127)
-					counterVaccLog = 127;
-			}
-		}
-
-
+	}
 }
 
-// Выводим на дисплей графику и текст
-void Display1	(void)
+// Р’С‹РІРѕРґРёРј РЅР° РґРёСЃРїР»РµР№ РіСЂР°С„РёРєСѓ Рё С‚РµРєСЃС‚
+void Display1(void)
 {
 	u8 X_bat, Y_bat;
 	u8 X_gps_ico, Y_gps_ico;
@@ -1819,67 +1796,79 @@ void Display1	(void)
 	u8 X_lora_ico, Y_lora_ico;
 	u8 X_lora_lev, Y_lora_lev;
 
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
 
-	// батарейка
+	// Р±Р°С‚Р°СЂРµР№РєР°
 	X_bat = 111;
 	Y_bat = 0;
-	SSD1306_DrawRectangle(0+X_bat, 0+Y_bat, 14, 7, SSD1306_COLOR_WHITE );
-	SSD1306_DrawFilledRectangle(15+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-	if (VaccAvg >= 3500)	SSD1306_DrawFilledRectangle(2+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-	if (VaccAvg >= 3690)	SSD1306_DrawFilledRectangle(X_bat+2+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-	if (VaccAvg >= 3780)	SSD1306_DrawFilledRectangle(X_bat+2+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-	if (VaccAvg >= 3850)	SSD1306_DrawFilledRectangle(X_bat+2+3+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
+	SSD1306_DrawRectangle(0 + X_bat, 0 + Y_bat, 14, 7, SSD1306_COLOR_WHITE);
+	SSD1306_DrawFilledRectangle(15 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+	if (VaccAvg >= 3500)
+		SSD1306_DrawFilledRectangle(2 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+	if (VaccAvg >= 3690)
+		SSD1306_DrawFilledRectangle(X_bat + 2 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+	if (VaccAvg >= 3780)
+		SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+	if (VaccAvg >= 3850)
+		SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
 	//////////////////////////////////////////////////////////////////////
 
 	// GPS
-	X_gps_ico=0;
-	Y_gps_ico=0;
-	SSD1306_DrawFilledRectangle(X_gps_ico, Y_gps_ico, 1, 6, SSD1306_COLOR_WHITE );
-	SSD1306_DrawCircle(X_gps_ico+6, Y_gps_ico+3, 3, SSD1306_COLOR_WHITE);
-	SSD1306_DrawCircle(X_gps_ico+6, Y_gps_ico+3, 2, SSD1306_COLOR_WHITE);
-	SSD1306_DrawFilledRectangle(X_gps_ico+11, Y_gps_ico, 1, 6, SSD1306_COLOR_WHITE );
-	SSD1306_DrawLine(X_gps_ico+2, Y_gps_ico+2, 2, 4, SSD1306_COLOR_WHITE);
-	SSD1306_DrawLine(X_gps_ico+10, Y_gps_ico+2, 10, 4, SSD1306_COLOR_WHITE);
+	X_gps_ico = 0;
+	Y_gps_ico = 0;
+	SSD1306_DrawFilledRectangle(X_gps_ico, Y_gps_ico, 1, 6, SSD1306_COLOR_WHITE);
+	SSD1306_DrawCircle(X_gps_ico + 6, Y_gps_ico + 3, 3, SSD1306_COLOR_WHITE);
+	SSD1306_DrawCircle(X_gps_ico + 6, Y_gps_ico + 3, 2, SSD1306_COLOR_WHITE);
+	SSD1306_DrawFilledRectangle(X_gps_ico + 11, Y_gps_ico, 1, 6, SSD1306_COLOR_WHITE);
+	SSD1306_DrawLine(X_gps_ico + 2, Y_gps_ico + 2, 2, 4, SSD1306_COLOR_WHITE);
+	SSD1306_DrawLine(X_gps_ico + 10, Y_gps_ico + 2, 10, 4, SSD1306_COLOR_WHITE);
 	//////////////////////////////////////////////////////////
 
 	// GPS level
-	X_gps_lev=15;
-	Y_gps_lev=0;
-	if (SatFix >= 1)	SSD1306_DrawFilledRectangle(X_gps_lev, Y_gps_lev+6, 2, 1, SSD1306_COLOR_WHITE );
-	if (SatFix >= 3)	SSD1306_DrawFilledRectangle(X_gps_lev+4, Y_gps_lev+4, 2, 3, SSD1306_COLOR_WHITE );
-	if (SatFix >= 5)	SSD1306_DrawFilledRectangle(X_gps_lev+8, Y_gps_lev+2, 2, 5, SSD1306_COLOR_WHITE );
-	if (SatFix >= 8)	SSD1306_DrawFilledRectangle(X_gps_lev+12, Y_gps_lev+0, 2, 7, SSD1306_COLOR_WHITE );
+	X_gps_lev = 15;
+	Y_gps_lev = 0;
+	if (SatFix >= 1)
+		SSD1306_DrawFilledRectangle(X_gps_lev, Y_gps_lev + 6, 2, 1, SSD1306_COLOR_WHITE);
+	if (SatFix >= 3)
+		SSD1306_DrawFilledRectangle(X_gps_lev + 4, Y_gps_lev + 4, 2, 3, SSD1306_COLOR_WHITE);
+	if (SatFix >= 5)
+		SSD1306_DrawFilledRectangle(X_gps_lev + 8, Y_gps_lev + 2, 2, 5, SSD1306_COLOR_WHITE);
+	if (SatFix >= 8)
+		SSD1306_DrawFilledRectangle(X_gps_lev + 12, Y_gps_lev + 0, 2, 7, SSD1306_COLOR_WHITE);
 	////////////////////////////////////////////
 	SSD1306_GotoXY(31, 0);
-	printf ("%d", SatFix);
-	//SSD1306_Puts("12", &Font_7x10, SSD1306_COLOR_WHITE);
+	printf("%d", SatFix);
+	// SSD1306_Puts("12", &Font_7x10, SSD1306_COLOR_WHITE);
 
 	//
-	//Антенна LORA
+	// РђРЅС‚РµРЅРЅР° LORA
 	X_lora_ico = 50;
 	Y_lora_ico = 0;
-	SSD1306_DrawFilledRectangle(X_lora_ico, Y_lora_ico, 1, 7, SSD1306_COLOR_WHITE );
-	SSD1306_DrawLine(X_lora_ico+2, Y_lora_ico+2, X_lora_ico+4, Y_lora_ico, SSD1306_COLOR_WHITE);
-	SSD1306_DrawLine(X_lora_ico+2, Y_lora_ico+3, X_lora_ico+5, Y_lora_ico, SSD1306_COLOR_WHITE);
-	SSD1306_DrawLine(X_lora_ico-1, Y_lora_ico+2, X_lora_ico-3, Y_lora_ico, SSD1306_COLOR_WHITE);
-	SSD1306_DrawLine(X_lora_ico-1, Y_lora_ico+3, X_lora_ico-4, Y_lora_ico, SSD1306_COLOR_WHITE);
+	SSD1306_DrawFilledRectangle(X_lora_ico, Y_lora_ico, 1, 7, SSD1306_COLOR_WHITE);
+	SSD1306_DrawLine(X_lora_ico + 2, Y_lora_ico + 2, X_lora_ico + 4, Y_lora_ico, SSD1306_COLOR_WHITE);
+	SSD1306_DrawLine(X_lora_ico + 2, Y_lora_ico + 3, X_lora_ico + 5, Y_lora_ico, SSD1306_COLOR_WHITE);
+	SSD1306_DrawLine(X_lora_ico - 1, Y_lora_ico + 2, X_lora_ico - 3, Y_lora_ico, SSD1306_COLOR_WHITE);
+	SSD1306_DrawLine(X_lora_ico - 1, Y_lora_ico + 3, X_lora_ico - 4, Y_lora_ico, SSD1306_COLOR_WHITE);
 	// LORA level
-	X_lora_lev=55;
-	Y_lora_lev=0;
-	if ( (LoraRssiMax >  -130) )	SSD1306_DrawFilledRectangle(X_lora_lev, Y_lora_lev+6, 2, 1, SSD1306_COLOR_WHITE );
-	if ( (LoraRssiMax >= -110) )	SSD1306_DrawFilledRectangle(X_lora_lev+4, Y_lora_lev+4, 2, 3, SSD1306_COLOR_WHITE );
-	if ( (LoraRssiMax >= -90) )		SSD1306_DrawFilledRectangle(X_lora_lev+8, Y_lora_lev+2, 2, 5, SSD1306_COLOR_WHITE );
-	if ( (LoraRssiMax >= -70) )		SSD1306_DrawFilledRectangle(X_lora_lev+12, Y_lora_lev+0, 2, 7, SSD1306_COLOR_WHITE );
+	X_lora_lev = 55;
+	Y_lora_lev = 0;
+	if ((LoraRssiMax > -130))
+		SSD1306_DrawFilledRectangle(X_lora_lev, Y_lora_lev + 6, 2, 1, SSD1306_COLOR_WHITE);
+	if ((LoraRssiMax >= -110))
+		SSD1306_DrawFilledRectangle(X_lora_lev + 4, Y_lora_lev + 4, 2, 3, SSD1306_COLOR_WHITE);
+	if ((LoraRssiMax >= -90))
+		SSD1306_DrawFilledRectangle(X_lora_lev + 8, Y_lora_lev + 2, 2, 5, SSD1306_COLOR_WHITE);
+	if ((LoraRssiMax >= -70))
+		SSD1306_DrawFilledRectangle(X_lora_lev + 12, Y_lora_lev + 0, 2, 7, SSD1306_COLOR_WHITE);
 
 	SSD1306_GotoXY(73, 0);
-	Time_Display2( SecRTC ); 		// отображаем время RTC без секунд
+	Time_Display2(SecRTC); // РѕС‚РѕР±СЂР°Р¶Р°РµРј РІСЂРµРјСЏ RTC Р±РµР· СЃРµРєСѓРЅРґ
 
 	SSD1306_GotoXY(0, 10);
-	printf ("UTC:%c%c:%c%c:%c%c.%c%c",GPSFixData.Time[0],GPSFixData.Time[1],GPSFixData.Time[2],GPSFixData.Time[3],GPSFixData.Time[4],
-			GPSFixData.Time[5], GPSFixData.Time[7], GPSFixData.Time[8]);
+	printf("UTC:%c%c:%c%c:%c%c.%c%c", GPSFixData.Time[0], GPSFixData.Time[1], GPSFixData.Time[2], GPSFixData.Time[3], GPSFixData.Time[4],
+		   GPSFixData.Time[5], GPSFixData.Time[7], GPSFixData.Time[8]);
 
 	SSD1306_GotoXY(112, 10);
 	if (counterTXDisplay > 0)
@@ -1890,513 +1879,504 @@ void Display1	(void)
 		printf("RX");
 
 	SSD1306_GotoXY(0, 20);
-	printf ("SATs:");
-//	for (i=0; i<2; i++)
-//		{
-//		if (GPSFixData.SatelliteNum[i] == '\0') break;
-//		OLED_Putc1 (GPSFixData.SatelliteNum[i]);
-//		}
-	printf ("%d", SatFix);					// количество спутников, участвующих в решении
-	printf ("/%d", SatNumGPS+SatNumGLO);  	// количество найденных при парсинге спутников
+	printf("SATs:");
+	//	for (i=0; i<2; i++)
+	//		{
+	//		if (GPSFixData.SatelliteNum[i] == '\0') break;
+	//		OLED_Putc1 (GPSFixData.SatelliteNum[i]);
+	//		}
+	printf("%d", SatFix);				  // РєРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ, СѓС‡Р°СЃС‚РІСѓСЋС‰РёС… РІ СЂРµС€РµРЅРёРё
+	printf("/%d", SatNumGPS + SatNumGLO); // РєРѕР»РёС‡РµСЃС‚РІРѕ РЅР°Р№РґРµРЅРЅС‹С… РїСЂРё РїР°СЂСЃРёРЅРіРµ СЃРїСѓС‚РЅРёРєРѕРІ
 
-//	SSD1306_GotoXY(72, 20);
-//	printf ("P:%d ", countPacket);
+	//	SSD1306_GotoXY(72, 20);
+	//	printf ("P:%d ", countPacket);
 
 	SSD1306_GotoXY(0, 30);
-	printf ("Vacc: %d.%03d V ", VaccAvg/1000, VaccAvg%1000);
+	printf("Vacc: %d.%03d V ", VaccAvg / 1000, VaccAvg % 1000);
 
 	SSD1306_GotoXY(96, 30);
-	if ( GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 0 )  		// идет заряд
+	if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 0) // РёРґРµС‚ Р·Р°СЂСЏРґ
 	{
-		printf ("CHRG!");
+		printf("CHRG!");
 	}
 
 	SSD1306_GotoXY(0, 40);
-	printf ("La: ");
-	for (i=0; i<9; i++)									// DDMM.MMM
-		{
-		if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-			OLED_Putc1 ( GPSFixData.Latitude[i]);
+	printf("La: ");
+	for (i = 0; i < 9; i++) // DDMM.MMM
+	{
+		if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+			OLED_Putc1(GPSFixData.Latitude[i]);
 		else
-			OLED_Putc1 ('-');
-		}
-	if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-		printf ("'%c ", GPSFixData.NS );
+			OLED_Putc1('-');
+	}
+	if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+		printf("'%c ", GPSFixData.NS);
 	else
-		printf ("--");
+		printf("--");
 
 	SSD1306_GotoXY(0, 50);
-	printf ("Lo: ");
-		if (GPSFixData.Longitude[0] == '0') 			// опускаем лидирующий ноль
+	printf("Lo: ");
+	if (GPSFixData.Longitude[0] == '0') // РѕРїСѓСЃРєР°РµРј Р»РёРґРёСЂСѓСЋС‰РёР№ РЅРѕР»СЊ
+	{
+		for (i = 1; i < 10; i++)
 		{
-			for (i=1; i<10; i++)
-				{
-				if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-					OLED_Putc1 ( GPSFixData.Longitude[i]);	// DDMM.MMM
-				else
-					OLED_Putc1 ('-');
-				}
+			if ((Fix == 2 || Fix == 3))				 // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+				OLED_Putc1(GPSFixData.Longitude[i]); // DDMM.MMM
+			else
+				OLED_Putc1('-');
 		}
-		else
-		{
-			for (i=0; i<10; i++)						// DDDMM.MMM
-				{
-				if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-					OLED_Putc1 ( GPSFixData.Longitude[i]);
-				else
-					OLED_Putc1 ('-');
-				}
-		}
-	if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-		printf ("'%c ", GPSFixData.EW );
+	}
 	else
-		printf ("--");
+	{
+		for (i = 0; i < 10; i++) // DDDMM.MMM
+		{
+			if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+				OLED_Putc1(GPSFixData.Longitude[i]);
+			else
+				OLED_Putc1('-');
+		}
+	}
+	if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+		printf("'%c ", GPSFixData.EW);
+	else
+		printf("--");
 
 	SSD1306_GotoXY(112, 50);
 	printf("#%d", LORA_TX_TIME);
-
 }
-// Напряжения аккумулятора, батареи, питания
-void Display2	(void)
+// РќР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°, Р±Р°С‚Р°СЂРµРё, РїРёС‚Р°РЅРёСЏ
+void Display2(void)
 {
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
 
 	SSD1306_GotoXY(0, 0);
-	printf ("%d.%03d V ", VaccAvg/1000, VaccAvg%1000 ); // усредненное напряжение аккумулятора
+	printf("%d.%03d V ", VaccAvg / 1000, VaccAvg % 1000); // СѓСЃСЂРµРґРЅРµРЅРЅРѕРµ РЅР°РїСЂСЏР¶РµРЅРёРµ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°
 
-//	SSD1306_GotoXY(7, 10);
-//	Time_Display( TimeStartLogVcc ); 	// отображаем время
-//	SSD1306_GotoXY(60, 10);
-//	printf ("%d  ", counterVaccLog );
-//	Time_Display( SecRTC ); 			// отображаем время
+	//	SSD1306_GotoXY(7, 10);
+	//	Time_Display( TimeStartLogVcc ); 	// РѕС‚РѕР±СЂР°Р¶Р°РµРј РІСЂРµРјСЏ
+	//	SSD1306_GotoXY(60, 10);
+	//	printf ("%d  ", counterVaccLog );
+	//	Time_Display( SecRTC ); 			// РѕС‚РѕР±СЂР°Р¶Р°РµРј РІСЂРµРјСЏ
 
 	SSD1306_GotoXY(60, 0);
-	Time_Display( TimeLogVcc ); 		// отображаем время, сколько пишется лог
+	Time_Display(TimeLogVcc); // РѕС‚РѕР±СЂР°Р¶Р°РµРј РІСЂРµРјСЏ, СЃРєРѕР»СЊРєРѕ РїРёС€РµС‚СЃСЏ Р»РѕРі
 
+	SSD1306_DrawLine(0, 15, 0, 63, SSD1306_COLOR_WHITE);   // РѕСЃСЊ Y - РЅР°РїСЂСЏР¶РµРЅРёРµ
+	SSD1306_DrawLine(0, 63, 127, 63, SSD1306_COLOR_WHITE); // РѕСЃСЊ X - РІСЂРµРјСЏ
 
-	SSD1306_DrawLine(0, 15, 0, 63, SSD1306_COLOR_WHITE);	// ось Y - напряжение
-	SSD1306_DrawLine(0, 63, 127, 63, SSD1306_COLOR_WHITE);	// ось X - время
-
-	for (i = 0; i < 22; i++) // деления времени , через 1 час, по 6 пикселей, 1 пиксель - 10 мин
+	for (i = 0; i < 22; i++) // РґРµР»РµРЅРёСЏ РІСЂРµРјРµРЅРё , С‡РµСЂРµР· 1 С‡Р°СЃ, РїРѕ 6 РїРёРєСЃРµР»РµР№, 1 РїРёРєСЃРµР»СЊ - 10 РјРёРЅ
 	{
-		SSD1306_DrawLine(i*6, 60, i*6, 63, SSD1306_COLOR_WHITE);
+		SSD1306_DrawLine(i * 6, 60, i * 6, 63, SSD1306_COLOR_WHITE);
 	}
 
-	for (i = 0; i < 6; i++) // деления напряжения , через 0,2 В, по 8 пикселей, 1 пиксель - 25 мВ
+	for (i = 0; i < 6; i++) // РґРµР»РµРЅРёСЏ РЅР°РїСЂСЏР¶РµРЅРёСЏ , С‡РµСЂРµР· 0,2 Р’, РїРѕ 8 РїРёРєСЃРµР»РµР№, 1 РїРёРєСЃРµР»СЊ - 25 РјР’
 	{
 		SSD1306_DrawLine(1, 15 + i * 8, 3, 15 + i * 8, SSD1306_COLOR_WHITE);
 	}
 
-	for (i = 1; i<= 127; i++) // рисуем график
+	for (i = 1; i <= 127; i++) // СЂРёСЃСѓРµРј РіСЂР°С„РёРє
 	{
-		if (VaccLog[i] == 0) // если значение 0, то не рисуем
+		if (VaccLog[i] == 0) // РµСЃР»Рё Р·РЅР°С‡РµРЅРёРµ 0, С‚Рѕ РЅРµ СЂРёСЃСѓРµРј
 			break;
 
-		SSD1306_DrawLine(i-1+1, 63 - VaccLog[i-1], i+1, 63 - VaccLog[i], SSD1306_COLOR_WHITE);
+		SSD1306_DrawLine(i - 1 + 1, 63 - VaccLog[i - 1], i + 1, 63 - VaccLog[i], SSD1306_COLOR_WHITE);
 	}
 
-
-	SSD1306_DrawLine(127, 12, 127, 52, SSD1306_COLOR_WHITE);	// ось Y - мгновенное напряжение
-	for (i = 0; i < 5; i++) // деления напряжения , через 10 мВ, по 10 пикселей, 1 пиксель - 1 мВ
+	SSD1306_DrawLine(127, 12, 127, 52, SSD1306_COLOR_WHITE); // РѕСЃСЊ Y - РјРіРЅРѕРІРµРЅРЅРѕРµ РЅР°РїСЂСЏР¶РµРЅРёРµ
+	for (i = 0; i < 5; i++)									 // РґРµР»РµРЅРёСЏ РЅР°РїСЂСЏР¶РµРЅРёСЏ , С‡РµСЂРµР· 10 РјР’, РїРѕ 10 РїРёРєСЃРµР»РµР№, 1 РїРёРєСЃРµР»СЊ - 1 РјР’
 	{
 		SSD1306_DrawLine(125, 12 + i * 10, 126, 12 + i * 10, SSD1306_COLOR_WHITE);
 	}
 
-	if (counterVaccosc == 5) // обновление осциллограммы каждые 5 циклов
+	if (counterVaccosc == 5) // РѕР±РЅРѕРІР»РµРЅРёРµ РѕСЃС†РёР»Р»РѕРіСЂР°РјРјС‹ РєР°Р¶РґС‹Рµ 5 С†РёРєР»РѕРІ
 	{
 		counterVaccosc = 0;
 
 		for (i = 99; i > 0; i--)
-			VaccOsc [i] = VaccOsc [i-1];
+			VaccOsc[i] = VaccOsc[i - 1];
 
 		VaccOsc[0] = Vacc1 - VaccAvg;
 	}
 	else
-		counterVaccosc ++;
+		counterVaccosc++;
 
-	for (i = 1 ; i < 100; i++)	// график мгновенного напряжения
+	for (i = 1; i < 100; i++) // РіСЂР°С„РёРє РјРіРЅРѕРІРµРЅРЅРѕРіРѕ РЅР°РїСЂСЏР¶РµРЅРёСЏ
 	{
-		SSD1306_DrawLine(20 + i-1, 32 - VaccOsc[i-1], 20 + i, 32 - VaccOsc[i], SSD1306_COLOR_WHITE);
+		SSD1306_DrawLine(20 + i - 1, 32 - VaccOsc[i - 1], 20 + i, 32 - VaccOsc[i], SSD1306_COLOR_WHITE);
 	}
 
-/*	if (counterVaccosc == 99) 			// массив усреднения Vacc сдвинулся на 100
-	{
-		counterVaccosc = 0;
-		for (i = 0 ; i < Average1; i++)	// обновляем массив осциллограммы
+	/*	if (counterVaccosc == 99) 			// РјР°СЃСЃРёРІ СѓСЃСЂРµРґРЅРµРЅРёСЏ Vacc СЃРґРІРёРЅСѓР»СЃСЏ РЅР° 100
 		{
-			VaccOsc [i] = Vacc [i] - VaccAvg;
+			counterVaccosc = 0;
+			for (i = 0 ; i < Average1; i++)	// РѕР±РЅРѕРІР»СЏРµРј РјР°СЃСЃРёРІ РѕСЃС†РёР»Р»РѕРіСЂР°РјРјС‹
+			{
+				VaccOsc [i] = Vacc [i] - VaccAvg;
+			}
 		}
-	}
-	else
-		counterVaccosc ++;
+		else
+			counterVaccosc ++;
 
-	for (i = 1 ; i < Average1; i++)	// график мгновенного напряжения
-	{
-		SSD1306_DrawLine(20 + i-1, 32 - VaccOsc[i-1], 20 + i, 32 - VaccOsc[i], SSD1306_COLOR_WHITE);
-	}*/
+		for (i = 1 ; i < Average1; i++)	// РіСЂР°С„РёРє РјРіРЅРѕРІРµРЅРЅРѕРіРѕ РЅР°РїСЂСЏР¶РµРЅРёСЏ
+		{
+			SSD1306_DrawLine(20 + i-1, 32 - VaccOsc[i-1], 20 + i, 32 - VaccOsc[i], SSD1306_COLOR_WHITE);
+		}*/
 
-//	SSD1306_GotoXY(0, 0);
-//	printf ("Vacc %d.%03d V ", Vacc1/1000, Vacc1%1000);
-//
-//	SSD1306_GotoXY(0, 10);
-//	printf ("Vref %d.%03d V ", Vref1/1000, Vref1%1000);
-//
-//	SSD1306_GotoXY(0, 20);
-//	printf ("Vbat %d.%03d V ", Vbat1/1000, Vbat1%1000);
-//
-//	SSD1306_GotoXY(0, 30);
-//	printf ("Vacc %d.%03d V %d %% ", VaccAvg/1000, VaccAvg%1000, VaccDev);
-//
-//	SSD1306_GotoXY(0, 40);
-//	printf ("Vref %d.%03d V %d %%", VrefAvg/1000, VrefAvg%1000, VrefDev);
-//
-//	SSD1306_GotoXY(0, 50);
-//	printf ("Vbat %d.%03d V %d %% ", VbatAvg/1000, VbatAvg%1000, VbatDev);
-//
-//	SSD1306_GotoXY(96, 0);
-//	if ( GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 0 )  		// идет заряд
-//	{
-//		printf ("CHRG!");
-//	}
-//	if ( GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_3) == 1 )  		// USB подключен
-//	{ // не работает из-за пересечения с JTAG
-//		SSD1306_GotoXY(96, 10);
-//		printf ("USB");
-//	}
-
+	//	SSD1306_GotoXY(0, 0);
+	//	printf ("Vacc %d.%03d V ", Vacc1/1000, Vacc1%1000);
+	//
+	//	SSD1306_GotoXY(0, 10);
+	//	printf ("Vref %d.%03d V ", Vref1/1000, Vref1%1000);
+	//
+	//	SSD1306_GotoXY(0, 20);
+	//	printf ("Vbat %d.%03d V ", Vbat1/1000, Vbat1%1000);
+	//
+	//	SSD1306_GotoXY(0, 30);
+	//	printf ("Vacc %d.%03d V %d %% ", VaccAvg/1000, VaccAvg%1000, VaccDev);
+	//
+	//	SSD1306_GotoXY(0, 40);
+	//	printf ("Vref %d.%03d V %d %%", VrefAvg/1000, VrefAvg%1000, VrefDev);
+	//
+	//	SSD1306_GotoXY(0, 50);
+	//	printf ("Vbat %d.%03d V %d %% ", VbatAvg/1000, VbatAvg%1000, VbatDev);
+	//
+	//	SSD1306_GotoXY(96, 0);
+	//	if ( GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 0 )  		// РёРґРµС‚ Р·Р°СЂСЏРґ
+	//	{
+	//		printf ("CHRG!");
+	//	}
+	//	if ( GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_3) == 1 )  		// USB РїРѕРґРєР»СЋС‡РµРЅ
+	//	{ // РЅРµ СЂР°Р±РѕС‚Р°РµС‚ РёР·-Р·Р° РїРµСЂРµСЃРµС‡РµРЅРёСЏ СЃ JTAG
+	//		SSD1306_GotoXY(96, 10);
+	//		printf ("USB");
+	//	}
 }
-// Время RTC и GPS
-void Display3 	(void)
+// Р’СЂРµРјСЏ RTC Рё GPS
+void Display3(void)
 {
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
 
 	SSD1306_GotoXY(110, 0);
-	printf ("*%d", flagTXDisplay);
+	printf("*%d", flagTXDisplay);
 
 	SSD1306_GotoXY(0, 0);
-	printf ("RTC: ");
-	//SSD1306_GotoXY(0, 10);
-	Time_Display( sec_RTC_to_display );
+	printf("RTC: ");
+	// SSD1306_GotoXY(0, 10);
+	Time_Display(sec_RTC_to_display);
 
 	SSD1306_GotoXY(0, 10);
-	printf ("GPS: ");
-	//SSD1306_GotoXY(0, 30);
-	Time_Display( sec_GPS_to_display );		// выводим на экран HH:MM:SS - время, полученное из секунд GPS текущих суток
-	printf (".%d", GPSTimeMilliSec );		// и миллисекунды
-	//printf ("%c%c:%c%c:%c%c.%c%c",GPSFixData.Time[0],GPSFixData.Time[1],GPSFixData.Time[2],GPSFixData.Time[3],GPSFixData.Time[4],
+	printf("GPS: ");
+	// SSD1306_GotoXY(0, 30);
+	Time_Display(sec_GPS_to_display); // РІС‹РІРѕРґРёРј РЅР° СЌРєСЂР°РЅ HH:MM:SS - РІСЂРµРјСЏ, РїРѕР»СѓС‡РµРЅРЅРѕРµ РёР· СЃРµРєСѓРЅРґ GPS С‚РµРєСѓС‰РёС… СЃСѓС‚РѕРє
+	printf(".%d", GPSTimeMilliSec);	  // Рё РјРёР»Р»РёСЃРµРєСѓРЅРґС‹
+	// printf ("%c%c:%c%c:%c%c.%c%c",GPSFixData.Time[0],GPSFixData.Time[1],GPSFixData.Time[2],GPSFixData.Time[3],GPSFixData.Time[4],
 	//		GPSFixData.Time[5], GPSFixData.Time[7], GPSFixData.Time[8]);
 
 	SSD1306_GotoXY(0, 20);
 
-	printf ("Date: ");
-	for (i=0; i<2; i++)
-		{
+	printf("Date: ");
+	for (i = 0; i < 2; i++)
+	{
 		OLED_Putc1(GPSFixData.Day[i]);
-		}
+	}
 	OLED_Putc1('.');
-	for (i=0; i<2; i++)
-		{
+	for (i = 0; i < 2; i++)
+	{
 		OLED_Putc1(GPSFixData.Month[i]);
-		}
+	}
 	OLED_Putc1('.');
-	for (i=0; i<4; i++)
-		{
+	for (i = 0; i < 4; i++)
+	{
 		OLED_Putc1(GPSFixData.Year[i]);
-		}
+	}
 	SSD1306_GotoXY(0, 30);
-	printf ("Sec RTC: %d", SecRTC );
+	printf("Sec RTC: %d", SecRTC);
 	SSD1306_GotoXY(0, 40);
-	printf ("Sec GPS: %d", GPSTimeSec);
+	printf("Sec GPS: %d", GPSTimeSec);
 
 	SSD1306_GotoXY(0, 50);
-	printf ("Sat:%d/%d", SatNumGPS, SatFix);  	// количество найденных при парсинге спутников
+	printf("Sat:%d/%d", SatNumGPS, SatFix); // РєРѕР»РёС‡РµСЃС‚РІРѕ РЅР°Р№РґРµРЅРЅС‹С… РїСЂРё РїР°СЂСЃРёРЅРіРµ СЃРїСѓС‚РЅРёРєРѕРІ
 	SSD1306_GotoXY(80, 50);
-	printf ("Fix: %d", Fix);
-
+	printf("Fix: %d", Fix);
 }
-// уровень сигнала со спутников в виде ID S/N dB
-void Display4 	(void)
+// СѓСЂРѕРІРµРЅСЊ СЃРёРіРЅР°Р»Р° СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ РІ РІРёРґРµ ID S/N dB
+void Display4(void)
 {
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
 
-//	SSD1306_GotoXY(105, 0);
-//	printf ("%d", SatNum);  	// количество найденных при парсинге спутников
-//	SSD1306_GotoXY(105, 10);
-//	printf ("%d", SatFix);		// количество спутников, участвующих в решении
+	//	SSD1306_GotoXY(105, 0);
+	//	printf ("%d", SatNum);  	// РєРѕР»РёС‡РµСЃС‚РІРѕ РЅР°Р№РґРµРЅРЅС‹С… РїСЂРё РїР°СЂСЃРёРЅРіРµ СЃРїСѓС‚РЅРёРєРѕРІ
+	//	SSD1306_GotoXY(105, 10);
+	//	printf ("%d", SatFix);		// РєРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ, СѓС‡Р°СЃС‚РІСѓСЋС‰РёС… РІ СЂРµС€РµРЅРёРё
 
 	SSD1306_GotoXY(0, 0);
-	for (i=0; i<6; i++)		//	входят только первые 6 спутников GPS
+	for (i = 0; i < 6; i++) //	РІС…РѕРґСЏС‚ С‚РѕР»СЊРєРѕ РїРµСЂРІС‹Рµ 6 СЃРїСѓС‚РЅРёРєРѕРІ GPS
 	{
-	//	if (i<6)
-	//	{
-			SSD1306_GotoXY(0, 10 * i);
+		//	if (i<6)
+		//	{
+		SSD1306_GotoXY(0, 10 * i);
 
-			for (j=0; j<3; j++)
-			{
-				if ( GPSFixData.Sats[i][0][j] == '\0' )
-					break;
-				SSD1306_Putc (GPSFixData.Sats[i][0][j], &Font_7x10, SSD1306_COLOR_WHITE ); // номер спутника
-			}
-
-			SSD1306_GotoXY(18, 10 * i);
-
-			for (j=0; j<3; j++)
-			{
-				if ( GPSFixData.Sats[i][3][j] == '\0' )
-					break;
-				SSD1306_Putc (GPSFixData.Sats[i][3][j], &Font_7x10, SSD1306_COLOR_WHITE ); // SNR спутника
-			}
-			printf ("dB");
-	//	}
-	}
-	for (i=0; i<6; i++)		//	входят только первые 6 спутников GLONASS
-		//else if (i<12) // выводим максимум 12 спутников
+		for (j = 0; j < 3; j++)
 		{
-			SSD1306_GotoXY(55, 10 * i);
-
-			for (j=0; j<3; j++)
-			{
-				if ( GPSFixData.SatsGLO[i][0][j] == '\0' )
-					break;
-				SSD1306_Putc (GPSFixData.SatsGLO[i][0][j], &Font_7x10, SSD1306_COLOR_WHITE );	// номер спутника
-			}
-
-			SSD1306_GotoXY(73, 10 * i);
-
-			for (j=0; j<3; j++)
-			{
-				if ( GPSFixData.SatsGLO[i][3][j] == '\0' )
-					break;
-				SSD1306_Putc (GPSFixData.SatsGLO[i][3][j], &Font_7x10, SSD1306_COLOR_WHITE );	// SNR спутника
-			}
-			printf ("dB");
+			if (GPSFixData.Sats[i][0][j] == '\0')
+				break;
+			SSD1306_Putc(GPSFixData.Sats[i][0][j], &Font_7x10, SSD1306_COLOR_WHITE); // РЅРѕРјРµСЂ СЃРїСѓС‚РЅРёРєР°
 		}
+
+		SSD1306_GotoXY(18, 10 * i);
+
+		for (j = 0; j < 3; j++)
+		{
+			if (GPSFixData.Sats[i][3][j] == '\0')
+				break;
+			SSD1306_Putc(GPSFixData.Sats[i][3][j], &Font_7x10, SSD1306_COLOR_WHITE); // SNR СЃРїСѓС‚РЅРёРєР°
+		}
+		printf("dB");
+		//	}
+	}
+	for (i = 0; i < 6; i++) //	РІС…РѕРґСЏС‚ С‚РѕР»СЊРєРѕ РїРµСЂРІС‹Рµ 6 СЃРїСѓС‚РЅРёРєРѕРІ GLONASS
+	// else if (i<12) // РІС‹РІРѕРґРёРј РјР°РєСЃРёРјСѓРј 12 СЃРїСѓС‚РЅРёРєРѕРІ
+	{
+		SSD1306_GotoXY(55, 10 * i);
+
+		for (j = 0; j < 3; j++)
+		{
+			if (GPSFixData.SatsGLO[i][0][j] == '\0')
+				break;
+			SSD1306_Putc(GPSFixData.SatsGLO[i][0][j], &Font_7x10, SSD1306_COLOR_WHITE); // РЅРѕРјРµСЂ СЃРїСѓС‚РЅРёРєР°
+		}
+
+		SSD1306_GotoXY(73, 10 * i);
+
+		for (j = 0; j < 3; j++)
+		{
+			if (GPSFixData.SatsGLO[i][3][j] == '\0')
+				break;
+			SSD1306_Putc(GPSFixData.SatsGLO[i][3][j], &Font_7x10, SSD1306_COLOR_WHITE); // SNR СЃРїСѓС‚РЅРёРєР°
+		}
+		printf("dB");
+	}
 	//	else {
 	//		break;
 	//	}
 
 	//}
-
 }
-// уровень сигнала со спутников в графическом виде
-void Display5	(void)
+// СѓСЂРѕРІРµРЅСЊ СЃРёРіРЅР°Р»Р° СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ РІ РіСЂР°С„РёС‡РµСЃРєРѕРј РІРёРґРµ
+void Display5(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
-	for (i=0; i<SatNumGPS; i++) 	// перебираем все видимые спутники GPS
+	for (i = 0; i < SatNumGPS; i++) // РїРµСЂРµР±РёСЂР°РµРј РІСЃРµ РІРёРґРёРјС‹Рµ СЃРїСѓС‚РЅРёРєРё GPS
 	{
-		SatIDGPS [i] = (GPSFixData.Sats[i][0][0] - 0x30) * 10 + (GPSFixData.Sats[i][0][1] - 0x30) * 1 ;
+		SatIDGPS[i] = (GPSFixData.Sats[i][0][0] - 0x30) * 10 + (GPSFixData.Sats[i][0][1] - 0x30) * 1;
 
-		for (j=0; j<3; j++)
+		for (j = 0; j < 3; j++)
 		{
-			if ( GPSFixData.Sats[i][3][j] == '\0' ) 	// считаем сколько цифр в числе S/N
+			if (GPSFixData.Sats[i][3][j] == '\0') // СЃС‡РёС‚Р°РµРј СЃРєРѕР»СЊРєРѕ С†РёС„СЂ РІ С‡РёСЃР»Рµ S/N
 				break;
 		}
 
-		if (j==3) 		// три цифры
+		if (j == 3) // С‚СЂРё С†РёС„СЂС‹
 		{
-			SatLevelsGPS [i] = (GPSFixData.Sats[i][3][0] - 0x30) * 100 + (GPSFixData.Sats[i][3][1] - 0x30) * 10 + (GPSFixData.Sats[i][3][2] - 0x30) * 1 ;
+			SatLevelsGPS[i] = (GPSFixData.Sats[i][3][0] - 0x30) * 100 + (GPSFixData.Sats[i][3][1] - 0x30) * 10 + (GPSFixData.Sats[i][3][2] - 0x30) * 1;
 		}
-		else if (j==2) 	// две цифры
+		else if (j == 2) // РґРІРµ С†РёС„СЂС‹
 		{
-			SatLevelsGPS [i] = (GPSFixData.Sats[i][3][0] - 0x30) * 10 + (GPSFixData.Sats[i][3][1] - 0x30) * 1 ;
+			SatLevelsGPS[i] = (GPSFixData.Sats[i][3][0] - 0x30) * 10 + (GPSFixData.Sats[i][3][1] - 0x30) * 1;
 		}
-		else if (j==1) 	// одна цифра
+		else if (j == 1) // РѕРґРЅР° С†РёС„СЂР°
 		{
-			SatLevelsGPS [i] = GPSFixData.Sats[i][3][0] - 0x30 ;
+			SatLevelsGPS[i] = GPSFixData.Sats[i][3][0] - 0x30;
 		}
-//printf ("%d %d;", i, j);
+		// printf ("%d %d;", i, j);
 	}
 
-	SatSummGPS = 0; 			// сумма уровней сигналов со спутников GPS
-	for (i=0; i<SatNumGPS; i++)
+	SatSummGPS = 0; // СЃСѓРјРјР° СѓСЂРѕРІРЅРµР№ СЃРёРіРЅР°Р»РѕРІ СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ GPS
+	for (i = 0; i < SatNumGPS; i++)
 	{
 		SatSummGPS += SatLevelsGPS[i];
 	}
 
-	// ---------------------------- GLONASS спутники -------------------------------------------
-	for (i=0; i<SatNumGLO; i++) 	// перебираем все видимые спутники GPS
+	// ---------------------------- GLONASS СЃРїСѓС‚РЅРёРєРё -------------------------------------------
+	for (i = 0; i < SatNumGLO; i++) // РїРµСЂРµР±РёСЂР°РµРј РІСЃРµ РІРёРґРёРјС‹Рµ СЃРїСѓС‚РЅРёРєРё GPS
+	{
+		SatIDGLO[i] = (GPSFixData.SatsGLO[i][0][0] - 0x30) * 10 + (GPSFixData.SatsGLO[i][0][1] - 0x30) * 1;
+
+		for (j = 0; j < 3; j++)
 		{
-			SatIDGLO [i] = (GPSFixData.SatsGLO[i][0][0] - 0x30) * 10 + (GPSFixData.SatsGLO[i][0][1] - 0x30) * 1 ;
-
-			for (j=0; j<3; j++)
-			{
-				if ( GPSFixData.SatsGLO[i][3][j] == '\0' ) 	// считаем сколько цифр в числе S/N
-					break;
-			}
-
-			if (j==3) 		// три цифры
-			{
-				SatLevelsGLO [i] = (GPSFixData.SatsGLO[i][3][0] - 0x30) * 100 + (GPSFixData.SatsGLO[i][3][1] - 0x30) * 10 + (GPSFixData.SatsGLO[i][3][2] - 0x30) * 1 ;
-			}
-			else if (j==2) 	// две цифры
-			{
-				SatLevelsGLO [i] = (GPSFixData.SatsGLO[i][3][0] - 0x30) * 10 + (GPSFixData.SatsGLO[i][3][1] - 0x30) * 1 ;
-			}
-			else if (j==1) 	// одна цифра
-			{
-				SatLevelsGLO [i] = GPSFixData.SatsGLO[i][3][0] - 0x30 ;
-			}
-	//printf ("%d %d;", i, j);
+			if (GPSFixData.SatsGLO[i][3][j] == '\0') // СЃС‡РёС‚Р°РµРј СЃРєРѕР»СЊРєРѕ С†РёС„СЂ РІ С‡РёСЃР»Рµ S/N
+				break;
 		}
 
-		SatSummGLO = 0; 			 // сумма уровней сигналов со спутников GLONASS
-		for (i=0; i<SatNumGLO; i++)
+		if (j == 3) // С‚СЂРё С†РёС„СЂС‹
 		{
-			SatSummGLO += SatLevelsGLO[i];
+			SatLevelsGLO[i] = (GPSFixData.SatsGLO[i][3][0] - 0x30) * 100 + (GPSFixData.SatsGLO[i][3][1] - 0x30) * 10 + (GPSFixData.SatsGLO[i][3][2] - 0x30) * 1;
 		}
+		else if (j == 2) // РґРІРµ С†РёС„СЂС‹
+		{
+			SatLevelsGLO[i] = (GPSFixData.SatsGLO[i][3][0] - 0x30) * 10 + (GPSFixData.SatsGLO[i][3][1] - 0x30) * 1;
+		}
+		else if (j == 1) // РѕРґРЅР° С†РёС„СЂР°
+		{
+			SatLevelsGLO[i] = GPSFixData.SatsGLO[i][3][0] - 0x30;
+		}
+		// printf ("%d %d;", i, j);
+	}
+
+	SatSummGLO = 0; // СЃСѓРјРјР° СѓСЂРѕРІРЅРµР№ СЃРёРіРЅР°Р»РѕРІ СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ GLONASS
+	for (i = 0; i < SatNumGLO; i++)
+	{
+		SatSummGLO += SatLevelsGLO[i];
+	}
 	//---------------------------------------------------------------------------------------------
 
-	//rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	// rprintfInit (OLED_font1); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 	SSD1306_GotoXY(0, 0);
-	printf ("GPS:%d/%d", SatFixGPS, SatNumGPS );  		// количество найденных при парсинге спутников
+	printf("GPS:%d/%d", SatFixGPS, SatNumGPS); // РєРѕР»РёС‡РµСЃС‚РІРѕ РЅР°Р№РґРµРЅРЅС‹С… РїСЂРё РїР°СЂСЃРёРЅРіРµ СЃРїСѓС‚РЅРёРєРѕРІ
 	SSD1306_GotoXY(66, 0);
-	printf ("GLO:%d/%d", SatFixGLO, SatNumGLO );  	// количество найденных при парсинге спутников
+	printf("GLO:%d/%d", SatFixGLO, SatNumGLO); // РєРѕР»РёС‡РµСЃС‚РІРѕ РЅР°Р№РґРµРЅРЅС‹С… РїСЂРё РїР°СЂСЃРёРЅРіРµ СЃРїСѓС‚РЅРёРєРѕРІ
 
-	// считаем сумм использованных спутников GPS и рисуем уровни
+	// СЃС‡РёС‚Р°РµРј СЃСѓРјРј РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GPS Рё СЂРёСЃСѓРµРј СѓСЂРѕРІРЅРё
 	SatSummUsedGPS = 0;
-	for (i=0; i<SatNumGPS; i++)
+	for (i = 0; i < SatNumGPS; i++)
 	{
-		for (j=0; j<12; j++) // перебираем все спутники из решения, сравниваем номера
+		for (j = 0; j < 12; j++) // РїРµСЂРµР±РёСЂР°РµРј РІСЃРµ СЃРїСѓС‚РЅРёРєРё РёР· СЂРµС€РµРЅРёСЏ, СЃСЂР°РІРЅРёРІР°РµРј РЅРѕРјРµСЂР°
 		{
-			if ( SatUsedGPS [j] == SatIDGPS [i] )
+			if (SatUsedGPS[j] == SatIDGPS[i])
 			{
-				SatSummUsedGPS += SatLevelsGPS[i];  		// сумма S/N спутников, используемых в решении
-				SSD1306_DrawFilledRectangle(0 + i*4, 63-SatLevelsGPS[i], 2, SatLevelsGPS[i], SSD1306_COLOR_WHITE);  // спутники, используемые в решении - сплошным белым
+				SatSummUsedGPS += SatLevelsGPS[i];																	   // СЃСѓРјРјР° S/N СЃРїСѓС‚РЅРёРєРѕРІ, РёСЃРїРѕР»СЊР·СѓРµРјС‹С… РІ СЂРµС€РµРЅРёРё
+				SSD1306_DrawFilledRectangle(0 + i * 4, 63 - SatLevelsGPS[i], 2, SatLevelsGPS[i], SSD1306_COLOR_WHITE); // СЃРїСѓС‚РЅРёРєРё, РёСЃРїРѕР»СЊР·СѓРµРјС‹Рµ РІ СЂРµС€РµРЅРёРё - СЃРїР»РѕС€РЅС‹Рј Р±РµР»С‹Рј
 			}
 			else
-				SSD1306_DrawRectangle(0 + i*4, 63-SatLevelsGPS[i], 2, SatLevelsGPS[i], SSD1306_COLOR_WHITE);		  // спутники, неиспользуемые в решении - пустыми прямоугольниками
+				SSD1306_DrawRectangle(0 + i * 4, 63 - SatLevelsGPS[i], 2, SatLevelsGPS[i], SSD1306_COLOR_WHITE); // СЃРїСѓС‚РЅРёРєРё, РЅРµРёСЃРїРѕР»СЊР·СѓРµРјС‹Рµ РІ СЂРµС€РµРЅРёРё - РїСѓСЃС‚С‹РјРё РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°РјРё
 		}
 	}
-	// считаем сумм использованных спутников GLONASS и рисуем уровни
+	// СЃС‡РёС‚Р°РµРј СЃСѓРјРј РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GLONASS Рё СЂРёСЃСѓРµРј СѓСЂРѕРІРЅРё
 	SatSummUsedGLO = 0;
-	for (i=0; i<SatNumGLO; i++)
+	for (i = 0; i < SatNumGLO; i++)
 	{
-		for (j=0; j<12; j++) // перебираем все спутники из решения, сравниваем номера
+		for (j = 0; j < 12; j++) // РїРµСЂРµР±РёСЂР°РµРј РІСЃРµ СЃРїСѓС‚РЅРёРєРё РёР· СЂРµС€РµРЅРёСЏ, СЃСЂР°РІРЅРёРІР°РµРј РЅРѕРјРµСЂР°
 		{
-			if ( SatUsedGLO [j] == SatIDGLO [i] )
+			if (SatUsedGLO[j] == SatIDGLO[i])
 			{
-				SatSummUsedGLO += SatLevelsGLO[i];  		// сумма S/N спутников, используемых в решении
-				SSD1306_DrawFilledRectangle(66 + i*4, 63-SatLevelsGLO[i], 2, SatLevelsGLO[i], SSD1306_COLOR_WHITE);  // спутники, используемые в решении - сплошным белым
+				SatSummUsedGLO += SatLevelsGLO[i];																		// СЃСѓРјРјР° S/N СЃРїСѓС‚РЅРёРєРѕРІ, РёСЃРїРѕР»СЊР·СѓРµРјС‹С… РІ СЂРµС€РµРЅРёРё
+				SSD1306_DrawFilledRectangle(66 + i * 4, 63 - SatLevelsGLO[i], 2, SatLevelsGLO[i], SSD1306_COLOR_WHITE); // СЃРїСѓС‚РЅРёРєРё, РёСЃРїРѕР»СЊР·СѓРµРјС‹Рµ РІ СЂРµС€РµРЅРёРё - СЃРїР»РѕС€РЅС‹Рј Р±РµР»С‹Рј
 			}
 			else
-				SSD1306_DrawRectangle(66 + i*4, 63-SatLevelsGLO[i], 2, SatLevelsGLO[i], SSD1306_COLOR_WHITE);		  // спутники, неиспользуемые в решении - пустыми прямоугольниками
+				SSD1306_DrawRectangle(66 + i * 4, 63 - SatLevelsGLO[i], 2, SatLevelsGLO[i], SSD1306_COLOR_WHITE); // СЃРїСѓС‚РЅРёРєРё, РЅРµРёСЃРїРѕР»СЊР·СѓРµРјС‹Рµ РІ СЂРµС€РµРЅРёРё - РїСѓСЃС‚С‹РјРё РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°РјРё
 		}
 	}
 
 	SSD1306_GotoXY(0, 10);
-	printf ("S=%d/%d", SatSummUsedGPS, SatSummGPS);
+	printf("S=%d/%d", SatSummUsedGPS, SatSummGPS);
 
 	SSD1306_GotoXY(66, 10);
-	printf ("S=%d/%d", SatSummUsedGLO, SatSummGLO);
+	printf("S=%d/%d", SatSummUsedGLO, SatSummGLO);
 
 	SSD1306_GotoXY(101, 20);
-	printf ("%d", SatSummUsedGPS + SatSummUsedGLO);
-
+	printf("%d", SatSummUsedGPS + SatSummUsedGLO);
 }
-// PDOP, HDOP, VDOP параметры
-void Display6	(void)
+// PDOP, HDOP, VDOP РїР°СЂР°РјРµС‚СЂС‹
+void Display6(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	printf ("Auto2D3D: %d ", AutoSel_2D3D);
+	printf("Auto2D3D: %d ", AutoSel_2D3D);
 	SSD1306_GotoXY(0, 10);
-	printf ("Fix : %d", Fix);
+	printf("Fix : %d", Fix);
 	SSD1306_GotoXY(0, 20);
-	printf ("PDOP: %d.%d", PDOP/100, PDOP%100);
+	printf("PDOP: %d.%d", PDOP / 100, PDOP % 100);
 	SSD1306_GotoXY(0, 30);
-	printf ("HDOP: %d.%d", HDOP/100, HDOP%100);
+	printf("HDOP: %d.%d", HDOP / 100, HDOP % 100);
 	SSD1306_GotoXY(0, 40);
-	printf ("VDOP: %d.%d", VDOP/100, VDOP%100);
+	printf("VDOP: %d.%d", VDOP / 100, VDOP % 100);
 
 	SSD1306_GotoXY(0, 50);
-	//SSD1306_GotoXY(60, 20);
-	printf ("TTFF: %d s", TTFF);
-//	for (i=0; i<12; i++)
-//	{
-//		if ( SatUsed[i] != 0)
-//			printf ("%d ",  SatUsed [i]);
-//	}
-
+	// SSD1306_GotoXY(60, 20);
+	printf("TTFF: %d s", TTFF);
+	//	for (i=0; i<12; i++)
+	//	{
+	//		if ( SatUsed[i] != 0)
+	//			printf ("%d ",  SatUsed [i]);
+	//	}
 }
-// координаты и высота
-void Display7	(void)
+// РєРѕРѕСЂРґРёРЅР°С‚С‹ Рё РІС‹СЃРѕС‚Р°
+void Display7(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
 
 	SSD1306_GotoXY(0, 0);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
-	printf ("  Coordinates: ");
+	printf("  Coordinates: ");
 
-	rprintfInit (OLED_font2); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font2); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 10);
-	//printf ("La: ");
-	for (i=0; i<9; i++)									// DDMM.MMM
-		{
-			if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-				OLED_Putc2 ( GPSFixData.Latitude[i]);
-			else
-				OLED_Putc2 ('-');
-		}
-	if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-		printf ("'%c ", GPSFixData.NS );
+	// printf ("La: ");
+	for (i = 0; i < 9; i++) // DDMM.MMM
+	{
+		if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+			OLED_Putc2(GPSFixData.Latitude[i]);
+		else
+			OLED_Putc2('-');
+	}
+	if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+		printf("'%c ", GPSFixData.NS);
 	else
-		printf ("--");
+		printf("--");
 
 	SSD1306_GotoXY(0, 27);
-	//printf ("Lo: ");
-		if (GPSFixData.Longitude[0] == '0') 			// опускаем лидирующий ноль
+	// printf ("Lo: ");
+	if (GPSFixData.Longitude[0] == '0') // РѕРїСѓСЃРєР°РµРј Р»РёРґРёСЂСѓСЋС‰РёР№ РЅРѕР»СЊ
+	{
+		for (i = 1; i < 10; i++)
 		{
-			for (i=1; i<10; i++)
-				{
-				if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-					OLED_Putc2 ( GPSFixData.Longitude[i]);	// DDMM.MMM
-				else
-					OLED_Putc2 ('-');
-				}
+			if ((Fix == 2 || Fix == 3))				 // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+				OLED_Putc2(GPSFixData.Longitude[i]); // DDMM.MMM
+			else
+				OLED_Putc2('-');
 		}
-		else
-		{
-			for (i=0; i<10; i++)						// DDDMM.MMM
-				{
-				if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-					OLED_Putc2 ( GPSFixData.Longitude[i]);
-				else
-					OLED_Putc2 ('-');
-				}
-		}
-	if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-		printf ("'%c ", GPSFixData.EW );
+	}
 	else
-		printf ("--");
-
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
-	SSD1306_GotoXY(0, 50);
-	printf ("Alt: ");					// высота
-	SSD1306_GotoXY(30, 44);
-	for (i=0; i<5; i++)
+	{
+		for (i = 0; i < 10; i++) // DDDMM.MMM
 		{
-		if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
-			OLED_Putc2 ( GPSFixData.Altitude[i]);
-		else
-			OLED_Putc2 ('-');
+			if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+				OLED_Putc2(GPSFixData.Longitude[i]);
+			else
+				OLED_Putc2('-');
 		}
-	printf (" m");
+	}
+	if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+		printf("'%c ", GPSFixData.EW);
+	else
+		printf("--");
 
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
+	SSD1306_GotoXY(0, 50);
+	printf("Alt: "); // РІС‹СЃРѕС‚Р°
+	SSD1306_GotoXY(30, 44);
+	for (i = 0; i < 5; i++)
+	{
+		if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+			OLED_Putc2(GPSFixData.Altitude[i]);
+		else
+			OLED_Putc2('-');
+	}
+	printf(" m");
 }
 /*void Display7	(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit (OLED_font1); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
 	printf ("Lat : %d %d", GPSLatitude, GPS_N_S);
@@ -2409,23 +2389,23 @@ void Display7	(void)
 	printf ("La: ");
 	for (i=0; i<9; i++)									// DDMM.MMM
 		{
-			if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
+			if ( (Fix == 2 || Fix == 3) ) 	// РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
 				OLED_Putc1 ( GPSFixData.Latitude[i]);
 			else
 				OLED_Putc1 ('-');
 		}
-	if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
+	if ( (Fix == 2 || Fix == 3) ) 	// РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
 		printf ("'%c ", GPSFixData.NS );
 	else
 		printf ("--");
 
 	SSD1306_GotoXY(0, 40);
 	printf ("Lo: ");
-		if (GPSFixData.Longitude[0] == '0') 			// опускаем лидирующий ноль
+		if (GPSFixData.Longitude[0] == '0') 			// РѕРїСѓСЃРєР°РµРј Р»РёРґРёСЂСѓСЋС‰РёР№ РЅРѕР»СЊ
 		{
 			for (i=1; i<10; i++)
 				{
-				if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
+				if ( (Fix == 2 || Fix == 3) ) 	// РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
 					OLED_Putc1 ( GPSFixData.Longitude[i]);	// DDMM.MMM
 				else
 					OLED_Putc1 ('-');
@@ -2435,251 +2415,241 @@ void Display7	(void)
 		{
 			for (i=0; i<10; i++)						// DDDMM.MMM
 				{
-				if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
+				if ( (Fix == 2 || Fix == 3) ) 	// РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
 					OLED_Putc1 ( GPSFixData.Longitude[i]);
 				else
 					OLED_Putc1 ('-');
 				}
 		}
-	if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
+	if ( (Fix == 2 || Fix == 3) ) 	// РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
 		printf ("'%c ", GPSFixData.EW );
 	else
 		printf ("--");
 
 	SSD1306_GotoXY(0, 50);
-	printf ("Alt: ");					// высота
+	printf ("Alt: ");					// РІС‹СЃРѕС‚Р°
 	for (i=0; i<5; i++)
 		{
-		if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
+		if ( (Fix == 2 || Fix == 3) ) 	// РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
 			OLED_Putc1 ( GPSFixData.Altitude[i]);
 		else
 			OLED_Putc1 ('-');
 		}
 
 }*/
-// измерение длительности 1PPS
-void Display8	(void)
+// РёР·РјРµСЂРµРЅРёРµ РґР»РёС‚РµР»СЊРЅРѕСЃС‚Рё 1PPS
+void Display8(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	printf ("count: %d ", counter_TIM4_fix);
+	printf("count: %d ", counter_TIM4_fix);
 	SSD1306_GotoXY(0, 10);
-	printf ("TIM4 : %d ", TIM4_fix);
+	printf("TIM4 : %d ", TIM4_fix);
 	SSD1306_GotoXY(0, 20);
-	printf ("AVG  : %d ", averageTIM4_temp);
+	printf("AVG  : %d ", averageTIM4_temp);
 	SSD1306_GotoXY(0, 30);
-	printf ("cAvg : %d ", counter_AVG_1PPS);
+	printf("cAvg : %d ", counter_AVG_1PPS);
 	SSD1306_GotoXY(0, 40);
-	printf ("Fail:  %d ", flag_1PPS_fail);
+	printf("Fail:  %d ", flag_1PPS_fail);
 	SSD1306_GotoXY(0, 50);
-	printf ("AvgOK: %d ", flag_1PPS_AVG_OK);
-
+	printf("AvgOK: %d ", flag_1PPS_AVG_OK);
 }
-// приемник LORA
-void Display9	(void)
+// РїСЂРёРµРјРЅРёРє LORA
+void Display9(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	printf (" -LORA receiver-  ");
+	printf(" -LORA receiver-  ");
 	SSD1306_GotoXY(0, 20);
-	printf("RSSI:%d dBm ", (s32)(SX1276LoRaGetPacketRssi()) );
+	printf("RSSI:%d dBm ", (s32)(SX1276LoRaGetPacketRssi()));
 	SSD1306_GotoXY(112, 10);
 	if (counterRXDisplay > 0)
 		printf("RX");
 	SSD1306_GotoXY(0, 30);
-	printf("SNR:%d dB ", SX1276GetPacketSnr() );
+	printf("SNR:%d dB ", SX1276GetPacketSnr());
 	SSD1306_GotoXY(0, 30);
-	//printf("PER:%02d.%02d%% ", PER1, PER2 );
+	// printf("PER:%02d.%02d%% ", PER1, PER2 );
 	SSD1306_GotoXY(0, 40);
-	printf("Offset: %d Hz", (s32)FreqError );
+	printf("Offset: %d Hz", (s32)FreqError);
 	SSD1306_GotoXY(0, 50);
-	printf ("RX/ERR: %d / %d ", countOK - countERR, countERR);
-
+	printf("RX/ERR: %d / %d ", countOK - countERR, countERR);
 }
-// принятые координаты
-void Display10	(void)
+// РїСЂРёРЅСЏС‚С‹Рµ РєРѕРѕСЂРґРёРЅР°С‚С‹
+void Display10(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	//printf ("  Coordinates: ");
+	// printf ("  Coordinates: ");
 	SSD1306_GotoXY(0, 0);
-	printf("[1]:%d %d", structBuffer[1].Latitude, structBuffer[1].Vacc );
+	printf("[1]:%d %d", structBuffer[1].Latitude, structBuffer[1].Vacc);
 	SSD1306_GotoXY(0, 10);
-	printf("    %d %d", structBuffer[1].Longitude, structBuffer[1].reserv );
+	printf("    %d %d", structBuffer[1].Longitude, structBuffer[1].reserv);
 
 	SSD1306_GotoXY(0, 20);
-	printf("[2]:%d %d", structBuffer[2].Latitude, structBuffer[2].Vacc );
+	printf("[2]:%d %d", structBuffer[2].Latitude, structBuffer[2].Vacc);
 	SSD1306_GotoXY(0, 30);
-	printf("    %d %d", structBuffer[2].Longitude, structBuffer[2].reserv );
+	printf("    %d %d", structBuffer[2].Longitude, structBuffer[2].reserv);
 
 	SSD1306_GotoXY(0, 40);
-	printf("[3]:%d %d", structBuffer[3].Latitude, structBuffer[3].Vacc );
+	printf("[3]:%d %d", structBuffer[3].Latitude, structBuffer[3].Vacc);
 	SSD1306_GotoXY(0, 50);
-	printf("    %d %d", structBuffer[3].Longitude, structBuffer[3].reserv );
-
+	printf("    %d %d", structBuffer[3].Longitude, structBuffer[3].reserv);
 }
-// принятые времена посылок
-void Display11	(void)
+// РїСЂРёРЅСЏС‚С‹Рµ РІСЂРµРјРµРЅР° РїРѕСЃС‹Р»РѕРє
+void Display11(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	printf (" Times: ");
+	printf(" Times: ");
 	SSD1306_GotoXY(64, 0);
-	Time_Display( SecRTC ); 		// отображаем время RTC
+	Time_Display(SecRTC); // РѕС‚РѕР±СЂР°Р¶Р°РµРј РІСЂРµРјСЏ RTC
 
-	rprintfInit (OLED_font2); 		// вывод на OLED дисплей
-	//SSD1306_GotoXY(0, 10);
+	rprintfInit(OLED_font2); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
+	// SSD1306_GotoXY(0, 10);
 
-	//printf("[0]:%d", TimesOld[0] );
+	// printf("[0]:%d", TimesOld[0] );
 	SSD1306_GotoXY(0, 10);
-	printf("1 " );
+	printf("1 ");
 	SSD1306_GotoXY(32, 10);
-	Time_Display (TimesOld[1]);
+	Time_Display(TimesOld[1]);
 
 	SSD1306_GotoXY(0, 27);
-	printf("2 " );
+	printf("2 ");
 	SSD1306_GotoXY(32, 27);
-	Time_Display (TimesOld[2]);
+	Time_Display(TimesOld[2]);
 
 	SSD1306_GotoXY(0, 44);
-	printf("3 " );
+	printf("3 ");
 	SSD1306_GotoXY(32, 44);
-	Time_Display (TimesOld[3]);
+	Time_Display(TimesOld[3]);
 
-	//SSD1306_GotoXY(0, 50);
-	//printf("[4]:%d", TimesOld[4] );
-
+	// SSD1306_GotoXY(0, 50);
+	// printf("[4]:%d", TimesOld[4] );
 }
-// параметры принятых послылок
-void Display12	(void)
+// РїР°СЂР°РјРµС‚СЂС‹ РїСЂРёРЅСЏС‚С‹С… РїРѕСЃР»С‹Р»РѕРє
+void Display12(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	printf ("N P FreqE RSSI SNR");
-	for(i=1; i<4; i++)
+	printf("N P FreqE RSSI SNR");
+	for (i = 1; i < 4; i++)
 	{
-		SSD1306_GotoXY(0, 10*(i+1));
+		SSD1306_GotoXY(0, 10 * (i + 1));
 		printf("%d", i);
-		SSD1306_GotoXY(16, 10*(i+1));
-		printf("%d", LoraRX [i].Power);
-		SSD1306_GotoXY(34, 10*(i+1));
-		printf("%d", LoraRX [i].FreqError);
-		SSD1306_GotoXY(74, 10*(i+1));
-		printf("%d", LoraRX [i].RSSI);
-		SSD1306_GotoXY(106, 10*(i+1));
-		printf("%d", LoraRX [i].SNR );
+		SSD1306_GotoXY(16, 10 * (i + 1));
+		printf("%d", LoraRX[i].Power);
+		SSD1306_GotoXY(34, 10 * (i + 1));
+		printf("%d", LoraRX[i].FreqError);
+		SSD1306_GotoXY(74, 10 * (i + 1));
+		printf("%d", LoraRX[i].RSSI);
+		SSD1306_GotoXY(106, 10 * (i + 1));
+		printf("%d", LoraRX[i].SNR);
 	}
 
-	//SSD1306_GotoXY(0, 50);
-	//printf("RssiMax = %d", LoraRssiMax );
-
+	// SSD1306_GotoXY(0, 50);
+	// printf("RssiMax = %d", LoraRssiMax );
 }
-// PER от каждого маяка
-void Display13	(void)
+// PER РѕС‚ РєР°Р¶РґРѕРіРѕ РјР°СЏРєР°
+void Display13(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	printf ("N RSSI Count  PER");
-	for(i=1; i<4; i++)
+	printf("N RSSI Count  PER");
+	for (i = 1; i < 4; i++)
 	{
-		SSD1306_GotoXY(0, 10*(i+1));
+		SSD1306_GotoXY(0, 10 * (i + 1));
 		printf("%d", i);
-		SSD1306_GotoXY(14, 10*(i+1));
-		printf("%d", LoraRX [i].RSSI);
-		//printf("%d", TimeSecFirstRX[i]);
-		SSD1306_GotoXY(49, 10*(i+1));
+		SSD1306_GotoXY(14, 10 * (i + 1));
+		printf("%d", LoraRX[i].RSSI);
+		// printf("%d", TimeSecFirstRX[i]);
+		SSD1306_GotoXY(49, 10 * (i + 1));
 		printf("%d", CountRX[i]);
-		SSD1306_GotoXY(85, 10*(i+1));
-		if (PER [i] != 65535)
-			printf("%d.%02d%%", PER[i]/100, PER[i]%100);
-		//else
-			//printf("---%%", PER[i]);
-		//SSD1306_GotoXY(106, 10*(i+1));
-		//printf("%d", LoraRX [i].SNR );
+		SSD1306_GotoXY(85, 10 * (i + 1));
+		if (PER[i] != 65535)
+			printf("%d.%02d%%", PER[i] / 100, PER[i] % 100);
+		// else
+		// printf("---%%", PER[i]);
+		// SSD1306_GotoXY(106, 10*(i+1));
+		// printf("%d", LoraRX [i].SNR );
 	}
 
-//	SSD1306_GotoXY(0, 50);
-//	printf("Delta = %d  ", timeDelta );
-//	SSD1306_DrawPixel (127, 63, SSD1306_COLOR_WHITE );
-//	SSD1306_DrawPixel (127, 0, SSD1306_COLOR_WHITE );
-//	SSD1306_DrawPixel (0, 0, SSD1306_COLOR_WHITE );
-//	SSD1306_DrawPixel (0, 63, SSD1306_COLOR_WHITE );
-
+	//	SSD1306_GotoXY(0, 50);
+	//	printf("Delta = %d  ", timeDelta );
+	//	SSD1306_DrawPixel (127, 63, SSD1306_COLOR_WHITE );
+	//	SSD1306_DrawPixel (127, 0, SSD1306_COLOR_WHITE );
+	//	SSD1306_DrawPixel (0, 0, SSD1306_COLOR_WHITE );
+	//	SSD1306_DrawPixel (0, 63, SSD1306_COLOR_WHITE );
 }
-// тригонометрия
-void Display14	(void)
+// С‚СЂРёРіРѕРЅРѕРјРµС‚СЂРёСЏ
+void Display14(void)
 {
 	u32 temp;
 
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	printf ("    Distance: ");
+	printf("    Distance: ");
 
-	rprintfInit (OLED_font2); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font2); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 	SSD1306_GotoXY(0, 10);
 	temp = distance1_1_2 * 10;
-	printf ("1-2:%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
+	printf("1-2:%d.%d m", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 	SSD1306_GotoXY(0, 27);
 	temp = distance1_1_3 * 10;
-	printf ("1-3:%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
+	printf("1-3:%d.%d m", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 	SSD1306_GotoXY(0, 44);
 	temp = distance1_2_3 * 10;
-	printf ("2-3:%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
-
+	printf("2-3:%d.%d m", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 }
-// уровни сигнала от маяков в графическом виде
-void Display15	(void)
+// СѓСЂРѕРІРЅРё СЃРёРіРЅР°Р»Р° РѕС‚ РјР°СЏРєРѕРІ РІ РіСЂР°С„РёС‡РµСЃРєРѕРј РІРёРґРµ
+void Display15(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	printf ("      RSSI:    dBm");
+	printf("      RSSI:    dBm");
 
-
-	for (i=1; i<6; i++) // маяки с 1 по 5
+	for (i = 1; i < 6; i++) // РјР°СЏРєРё СЃ 1 РїРѕ 5
 	{
-		SSD1306_GotoXY(0, 10*i);
-		printf ("[%d]", i);
+		SSD1306_GotoXY(0, 10 * i);
+		printf("[%d]", i);
 
-		if (LoraRX [i].RSSI != 0) 	// есть какое-то измеренное значение
+		if (LoraRX[i].RSSI != 0) // РµСЃС‚СЊ РєР°РєРѕРµ-С‚Рѕ РёР·РјРµСЂРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 		{
-			if ( LoraRX [i].RSSI >= -140) // если уровень больше -140, рисуем
-				{
-					if ( LoraRX [i].RSSI > -55 )
-						SSD1306_DrawFilledRectangle( 20, 10*i+2, 85, 5, SSD1306_COLOR_WHITE );  // максимум, ограничение
-					else
-						SSD1306_DrawFilledRectangle( 20, 10*i+2, 85 + (55 + LoraRX [i].RSSI) , 5, SSD1306_COLOR_WHITE );  // уровень RSSI ( от -55 до -140 дБм )
-				}
+			if (LoraRX[i].RSSI >= -140) // РµСЃР»Рё СѓСЂРѕРІРµРЅСЊ Р±РѕР»СЊС€Рµ -140, СЂРёСЃСѓРµРј
+			{
+				if (LoraRX[i].RSSI > -55)
+					SSD1306_DrawFilledRectangle(20, 10 * i + 2, 85, 5, SSD1306_COLOR_WHITE); // РјР°РєСЃРёРјСѓРј, РѕРіСЂР°РЅРёС‡РµРЅРёРµ
+				else
+					SSD1306_DrawFilledRectangle(20, 10 * i + 2, 85 + (55 + LoraRX[i].RSSI), 5, SSD1306_COLOR_WHITE); // СѓСЂРѕРІРµРЅСЊ RSSI ( РѕС‚ -55 РґРѕ -140 РґР‘Рј )
+			}
 
-			if ( LoraRX [i].RSSI <= -100) // если 3 цифры в числе
-				SSD1306_GotoXY(106-7, 10*i);
+			if (LoraRX[i].RSSI <= -100) // РµСЃР»Рё 3 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+				SSD1306_GotoXY(106 - 7, 10 * i);
 			else
-				SSD1306_GotoXY(113-7, 10*i); // если 2 цифры в числе
+				SSD1306_GotoXY(113 - 7, 10 * i); // РµСЃР»Рё 2 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
 
-			printf ("%d", LoraRX [i].RSSI);
+			printf("%d", LoraRX[i].RSSI);
 		}
-
 	}
-
 }
 
-// основной экран
-void Display1Release	(void)
+// РѕСЃРЅРѕРІРЅРѕР№ СЌРєСЂР°РЅ
+void Display1Release(void)
 {
 	u32 temp;
 	u32 temp2;
@@ -2687,624 +2657,647 @@ void Display1Release	(void)
 	u16 VaccAvgTemp;
 
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	temp2 = sec_div % 10 ;
+	temp2 = sec_div % 10;
 
-	// батарейка
+	// Р±Р°С‚Р°СЂРµР№РєР°
 	X_bat = 0;
 	Y_bat = 0;
-	SSD1306_DrawRectangle(0+X_bat, 0+Y_bat, 14, 7, SSD1306_COLOR_WHITE );
-	SSD1306_DrawFilledRectangle(15+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-	if (VaccAvg >= 3500)	SSD1306_DrawFilledRectangle(2+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-	if (VaccAvg >= 3690)	SSD1306_DrawFilledRectangle(X_bat+2+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-	if (VaccAvg >= 3780)	SSD1306_DrawFilledRectangle(X_bat+2+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-	if (VaccAvg >= 3850)	SSD1306_DrawFilledRectangle(X_bat+2+3+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
+	SSD1306_DrawRectangle(0 + X_bat, 0 + Y_bat, 14, 7, SSD1306_COLOR_WHITE);
+	SSD1306_DrawFilledRectangle(15 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+	if (VaccAvg >= 3500)
+		SSD1306_DrawFilledRectangle(2 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+	if (VaccAvg >= 3690)
+		SSD1306_DrawFilledRectangle(X_bat + 2 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+	if (VaccAvg >= 3780)
+		SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+	if (VaccAvg >= 3850)
+		SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
 
-//------------------------------------------------------------------ 1 ------------------------------------------------------------------------------------------
+	//------------------------------------------------------------------ 1 ------------------------------------------------------------------------------------------
 	if (NumberDev == 1)
 	{
-		rprintfInit (OLED_font2);
+		rprintfInit(OLED_font2);
 
 		SSD1306_GotoXY(0, 10);
-		if ( temp2 == 2)
-			printf ("2>");
+		if (temp2 == 2)
+			printf("2>");
 		else
-			printf ("2 ");
+			printf("2 ");
 
-		if (LoraRX [2].RSSI != 0) 	// есть какое-то измеренное значение
-			{
-				if ( LoraRX [2].RSSI >= -140) // если уровень больше -140, рисуем
-					{
-						if ( LoraRX [2].RSSI > -55 )
-							SSD1306_DrawFilledRectangle( 24, 21, 85, 5, SSD1306_COLOR_WHITE );  // максимум, ограничение
-						else
-						{
-							SSD1306_DrawRectangle( 24, 21, 85, 5, SSD1306_COLOR_WHITE );
-							SSD1306_DrawFilledRectangle( 24, 21, 85 + (55 + LoraRX [2].RSSI) , 5, SSD1306_COLOR_WHITE );  // уровень RSSI ( от -55 до -140 дБм )
-						}
-					}
-
-				if ( LoraRX [2].RSSI <= -100) // если 3 цифры в числе
-					SSD1306_GotoXY(18, 11);
-				else
-					SSD1306_GotoXY(25, 11); // если 2 цифры в числе
-
-				rprintfInit (OLED_font1);
-				printf ("%d dBm ", LoraRX [2].RSSI );
-			}
-		else
-			{
-				SSD1306_GotoXY(25, 0+11); //
-				rprintfInit (OLED_font1);
-				printf ("Fail!");
-			}
-
-		if (LoraRX [2].Power > 0)
+		if (LoraRX[2].RSSI != 0) // РµСЃС‚СЊ РєР°РєРѕРµ-С‚Рѕ РёР·РјРµСЂРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 		{
-			SSD1306_GotoXY(80, 11); // мощность передатчика
-			printf("P%d", LoraRX [2].Power);
-			SSD1306_GotoXY(113, 11+10); // счетчик пакетов
-			printf("%02X", LoraRX [2].CounterTxP);
+			if (LoraRX[2].RSSI >= -140) // РµСЃР»Рё СѓСЂРѕРІРµРЅСЊ Р±РѕР»СЊС€Рµ -140, СЂРёСЃСѓРµРј
+			{
+				if (LoraRX[2].RSSI > -55)
+					SSD1306_DrawFilledRectangle(24, 21, 85, 5, SSD1306_COLOR_WHITE); // РјР°РєСЃРёРјСѓРј, РѕРіСЂР°РЅРёС‡РµРЅРёРµ
+				else
+				{
+					SSD1306_DrawRectangle(24, 21, 85, 5, SSD1306_COLOR_WHITE);
+					SSD1306_DrawFilledRectangle(24, 21, 85 + (55 + LoraRX[2].RSSI), 5, SSD1306_COLOR_WHITE); // СѓСЂРѕРІРµРЅСЊ RSSI ( РѕС‚ -55 РґРѕ -140 РґР‘Рј )
+				}
+			}
+
+			if (LoraRX[2].RSSI <= -100) // РµСЃР»Рё 3 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+				SSD1306_GotoXY(18, 11);
+			else
+				SSD1306_GotoXY(25, 11); // РµСЃР»Рё 2 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+
+			rprintfInit(OLED_font1);
+			printf("%d dBm ", LoraRX[2].RSSI);
 		}
-		rprintfInit (OLED_font1);
+		else
+		{
+			SSD1306_GotoXY(25, 0 + 11); //
+			rprintfInit(OLED_font1);
+			printf("Fail!");
+		}
+
+		if (LoraRX[2].Power > 0)
+		{
+			SSD1306_GotoXY(80, 11); // РјРѕС‰РЅРѕСЃС‚СЊ РїРµСЂРµРґР°С‚С‡РёРєР°
+			printf("P%d", LoraRX[2].Power);
+			SSD1306_GotoXY(113, 11 + 10); // СЃС‡РµС‚С‡РёРє РїР°РєРµС‚РѕРІ
+			printf("%02X", LoraRX[2].CounterTxP);
+		}
+		rprintfInit(OLED_font1);
 
 		SSD1306_GotoXY(25, 0);
 		if (distance1_1_2 < 100000)
-			{
+		{
 			temp = distance1_1_2 * 10;
-			printf ("%d.%dm", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
-			}
+			printf("%d.%dm", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
+		}
 		else
-			{
-			printf ("---.-m" ); // расстояние не определено
-			}
+		{
+			printf("---.-m"); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РЅРµ РѕРїСЂРµРґРµР»РµРЅРѕ
+		}
 
 		SSD1306_GotoXY(71, 0);
-		Time_Display (TimesOld[2]);
+		Time_Display(TimesOld[2]);
 
-		// батарейка
-		if ( structBuffer[2].Vacc != 0)
+		// Р±Р°С‚Р°СЂРµР№РєР°
+		if (structBuffer[2].Vacc != 0)
 		{
 			X_bat = 110;
 			Y_bat = 11;
-			SSD1306_DrawRectangle(0+X_bat, 0+Y_bat, 14, 7, SSD1306_COLOR_WHITE );
-			SSD1306_DrawFilledRectangle(15+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
+			SSD1306_DrawRectangle(0 + X_bat, 0 + Y_bat, 14, 7, SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledRectangle(15 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
 			VaccAvgTemp = structBuffer[2].Vacc;
-			if (VaccAvgTemp >= 3500)	SSD1306_DrawFilledRectangle(2+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3690)	SSD1306_DrawFilledRectangle(X_bat+2+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3780)	SSD1306_DrawFilledRectangle(X_bat+2+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3850)	SSD1306_DrawFilledRectangle(X_bat+2+3+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
+			if (VaccAvgTemp >= 3500)
+				SSD1306_DrawFilledRectangle(2 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3690)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3780)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3850)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
 		}
 
 		// ------------------------------------------
-		rprintfInit (OLED_font2);
+		rprintfInit(OLED_font2);
 
-		SSD1306_GotoXY(0, 32+10);
-		if ( temp2 == 3)
-			printf ("3>");
+		SSD1306_GotoXY(0, 32 + 10);
+		if (temp2 == 3)
+			printf("3>");
 		else
-			printf ("3 ");
+			printf("3 ");
 
-		if (LoraRX [3].RSSI != 0) 	// есть какое-то измеренное значение
-			{
-				if ( LoraRX [3].RSSI >= -140) // если уровень больше -140, рисуем
-					{
-						if ( LoraRX [3].RSSI > -55 )
-							SSD1306_DrawFilledRectangle( 24, 31+21, 85, 5, SSD1306_COLOR_WHITE );  // максимум, ограничение
-						else
-						{
-							SSD1306_DrawRectangle( 24, 31+21, 85, 5, SSD1306_COLOR_WHITE );
-							SSD1306_DrawFilledRectangle( 24, 31+21, 85 + (55 + LoraRX [3].RSSI) , 5, SSD1306_COLOR_WHITE );  // уровень RSSI ( от -55 до -140 дБм )
-						}
-					}
-
-				if ( LoraRX [3].RSSI <= -100) // если 3 цифры в числе
-					SSD1306_GotoXY(18, 31+11);
-				else
-					SSD1306_GotoXY(25, 31+11); // если 2 цифры в числе
-
-				rprintfInit (OLED_font1);
-				printf ("%d dBm", LoraRX [3].RSSI);
-			}
-		else
-			{
-				SSD1306_GotoXY(25, 31+11); //
-				rprintfInit (OLED_font1);
-				printf ("Fail!");
-			}
-
-		if (LoraRX [3].Power > 0)
+		if (LoraRX[3].RSSI != 0) // РµСЃС‚СЊ РєР°РєРѕРµ-С‚Рѕ РёР·РјРµСЂРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 		{
-			SSD1306_GotoXY(80, 31+11); // мощность передатчика
-			printf("P%d", LoraRX [3].Power);
-			SSD1306_GotoXY(113, 31+11+10); // счетчик пакетов
-			printf("%02X", LoraRX [3].CounterTxP);
+			if (LoraRX[3].RSSI >= -140) // РµСЃР»Рё СѓСЂРѕРІРµРЅСЊ Р±РѕР»СЊС€Рµ -140, СЂРёСЃСѓРµРј
+			{
+				if (LoraRX[3].RSSI > -55)
+					SSD1306_DrawFilledRectangle(24, 31 + 21, 85, 5, SSD1306_COLOR_WHITE); // РјР°РєСЃРёРјСѓРј, РѕРіСЂР°РЅРёС‡РµРЅРёРµ
+				else
+				{
+					SSD1306_DrawRectangle(24, 31 + 21, 85, 5, SSD1306_COLOR_WHITE);
+					SSD1306_DrawFilledRectangle(24, 31 + 21, 85 + (55 + LoraRX[3].RSSI), 5, SSD1306_COLOR_WHITE); // СѓСЂРѕРІРµРЅСЊ RSSI ( РѕС‚ -55 РґРѕ -140 РґР‘Рј )
+				}
+			}
+
+			if (LoraRX[3].RSSI <= -100) // РµСЃР»Рё 3 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+				SSD1306_GotoXY(18, 31 + 11);
+			else
+				SSD1306_GotoXY(25, 31 + 11); // РµСЃР»Рё 2 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+
+			rprintfInit(OLED_font1);
+			printf("%d dBm", LoraRX[3].RSSI);
+		}
+		else
+		{
+			SSD1306_GotoXY(25, 31 + 11); //
+			rprintfInit(OLED_font1);
+			printf("Fail!");
 		}
 
-		rprintfInit (OLED_font1);
+		if (LoraRX[3].Power > 0)
+		{
+			SSD1306_GotoXY(80, 31 + 11); // РјРѕС‰РЅРѕСЃС‚СЊ РїРµСЂРµРґР°С‚С‡РёРєР°
+			printf("P%d", LoraRX[3].Power);
+			SSD1306_GotoXY(113, 31 + 11 + 10); // СЃС‡РµС‚С‡РёРє РїР°РєРµС‚РѕРІ
+			printf("%02X", LoraRX[3].CounterTxP);
+		}
 
-		SSD1306_GotoXY(25, 31+0);
+		rprintfInit(OLED_font1);
+
+		SSD1306_GotoXY(25, 31 + 0);
 		if (distance1_1_3 < 100000)
-			{
+		{
 			temp = distance1_1_3 * 10;
-			printf ("%d.%dm", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
-			}
+			printf("%d.%dm", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
+		}
 		else
-			{
-			printf ("---.-m" ); // расстояние не определено
-			}
-		SSD1306_GotoXY(71, 31+0);
-		Time_Display (TimesOld[3]);
+		{
+			printf("---.-m"); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РЅРµ РѕРїСЂРµРґРµР»РµРЅРѕ
+		}
+		SSD1306_GotoXY(71, 31 + 0);
+		Time_Display(TimesOld[3]);
 
-		// батарейка
-		if ( structBuffer[3].Vacc != 0)
+		// Р±Р°С‚Р°СЂРµР№РєР°
+		if (structBuffer[3].Vacc != 0)
 		{
 			X_bat = 110;
-			Y_bat = 31+11;
-			SSD1306_DrawRectangle(0+X_bat, 0+Y_bat, 14, 7, SSD1306_COLOR_WHITE );
-			SSD1306_DrawFilledRectangle(15+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
+			Y_bat = 31 + 11;
+			SSD1306_DrawRectangle(0 + X_bat, 0 + Y_bat, 14, 7, SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledRectangle(15 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
 			VaccAvgTemp = structBuffer[3].Vacc;
-			if (VaccAvgTemp >= 3500)	SSD1306_DrawFilledRectangle(2+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3690)	SSD1306_DrawFilledRectangle(X_bat+2+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3780)	SSD1306_DrawFilledRectangle(X_bat+2+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3850)	SSD1306_DrawFilledRectangle(X_bat+2+3+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
+			if (VaccAvgTemp >= 3500)
+				SSD1306_DrawFilledRectangle(2 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3690)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3780)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3850)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
 		}
-
 	}
 
-//------------------------------------------------------------------ 2 ------------------------------------------------------------------------------------------
+	//------------------------------------------------------------------ 2 ------------------------------------------------------------------------------------------
 	if (NumberDev == 2)
 	{
-		rprintfInit (OLED_font2);
+		rprintfInit(OLED_font2);
 
 		SSD1306_GotoXY(0, 10);
-		if ( temp2 == 1)
-			printf ("1>");
+		if (temp2 == 1)
+			printf("1>");
 		else
-			printf ("1 ");
+			printf("1 ");
 
-		if (LoraRX [1].RSSI != 0) 	// есть какое-то измеренное значение
-			{
-				if ( LoraRX [1].RSSI >= -140) // если уровень больше -140, рисуем
-					{
-						if ( LoraRX [1].RSSI > -55 )
-							SSD1306_DrawFilledRectangle( 24, 21, 85, 5, SSD1306_COLOR_WHITE );  // максимум, ограничение
-						else
-						{
-							SSD1306_DrawRectangle( 24, 21, 85, 5, SSD1306_COLOR_WHITE );
-							SSD1306_DrawFilledRectangle( 24, 21, 85 + (55 + LoraRX [1].RSSI) , 5, SSD1306_COLOR_WHITE );  // уровень RSSI ( от -55 до -140 дБм )
-						}
-					}
-
-				if ( LoraRX [1].RSSI <= -100) // если 3 цифры в числе
-					SSD1306_GotoXY(18, 11);
-				else
-					SSD1306_GotoXY(25, 11); // если 2 цифры в числе
-
-				rprintfInit (OLED_font1);
-				printf ("%d dBm ", LoraRX [1].RSSI );
-			}
-		else
-			{
-				SSD1306_GotoXY(25, 0+11); //
-				rprintfInit (OLED_font1);
-				printf ("Fail!");
-			}
-
-		if (LoraRX [1].Power > 0)
+		if (LoraRX[1].RSSI != 0) // РµСЃС‚СЊ РєР°РєРѕРµ-С‚Рѕ РёР·РјРµСЂРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 		{
-			SSD1306_GotoXY(80, 11); // мощность передатчика
-			printf("P%d", LoraRX [1].Power);
-			SSD1306_GotoXY(113, 11+10); // счетчик пакетов
-			printf("%02X", LoraRX [1].CounterTxP);
+			if (LoraRX[1].RSSI >= -140) // РµСЃР»Рё СѓСЂРѕРІРµРЅСЊ Р±РѕР»СЊС€Рµ -140, СЂРёСЃСѓРµРј
+			{
+				if (LoraRX[1].RSSI > -55)
+					SSD1306_DrawFilledRectangle(24, 21, 85, 5, SSD1306_COLOR_WHITE); // РјР°РєСЃРёРјСѓРј, РѕРіСЂР°РЅРёС‡РµРЅРёРµ
+				else
+				{
+					SSD1306_DrawRectangle(24, 21, 85, 5, SSD1306_COLOR_WHITE);
+					SSD1306_DrawFilledRectangle(24, 21, 85 + (55 + LoraRX[1].RSSI), 5, SSD1306_COLOR_WHITE); // СѓСЂРѕРІРµРЅСЊ RSSI ( РѕС‚ -55 РґРѕ -140 РґР‘Рј )
+				}
+			}
+
+			if (LoraRX[1].RSSI <= -100) // РµСЃР»Рё 3 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+				SSD1306_GotoXY(18, 11);
+			else
+				SSD1306_GotoXY(25, 11); // РµСЃР»Рё 2 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+
+			rprintfInit(OLED_font1);
+			printf("%d dBm ", LoraRX[1].RSSI);
+		}
+		else
+		{
+			SSD1306_GotoXY(25, 0 + 11); //
+			rprintfInit(OLED_font1);
+			printf("Fail!");
 		}
 
-		rprintfInit (OLED_font1);
+		if (LoraRX[1].Power > 0)
+		{
+			SSD1306_GotoXY(80, 11); // РјРѕС‰РЅРѕСЃС‚СЊ РїРµСЂРµРґР°С‚С‡РёРєР°
+			printf("P%d", LoraRX[1].Power);
+			SSD1306_GotoXY(113, 11 + 10); // СЃС‡РµС‚С‡РёРє РїР°РєРµС‚РѕРІ
+			printf("%02X", LoraRX[1].CounterTxP);
+		}
+
+		rprintfInit(OLED_font1);
 
 		SSD1306_GotoXY(25, 0);
 		if (distance1_1_2 < 100000)
-			{
+		{
 			temp = distance1_1_2 * 10;
-			printf ("%d.%dm", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
-			}
+			printf("%d.%dm", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
+		}
 		else
-			{
-			printf ("---.-m" ); // расстояние не определено
-			}
+		{
+			printf("---.-m"); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РЅРµ РѕРїСЂРµРґРµР»РµРЅРѕ
+		}
 
 		SSD1306_GotoXY(71, 0);
-		Time_Display (TimesOld[1]);
+		Time_Display(TimesOld[1]);
 
-		// батарейка
-		if ( structBuffer[1].Vacc != 0)
+		// Р±Р°С‚Р°СЂРµР№РєР°
+		if (structBuffer[1].Vacc != 0)
 		{
 			X_bat = 110;
 			Y_bat = 11;
-			SSD1306_DrawRectangle(0+X_bat, 0+Y_bat, 14, 7, SSD1306_COLOR_WHITE );
-			SSD1306_DrawFilledRectangle(15+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
+			SSD1306_DrawRectangle(0 + X_bat, 0 + Y_bat, 14, 7, SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledRectangle(15 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
 			VaccAvgTemp = structBuffer[1].Vacc;
-			if (VaccAvgTemp >= 3500)	SSD1306_DrawFilledRectangle(2+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3690)	SSD1306_DrawFilledRectangle(X_bat+2+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3780)	SSD1306_DrawFilledRectangle(X_bat+2+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3850)	SSD1306_DrawFilledRectangle(X_bat+2+3+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
+			if (VaccAvgTemp >= 3500)
+				SSD1306_DrawFilledRectangle(2 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3690)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3780)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3850)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
 		}
 
 		// ---------------------------------------------
-		rprintfInit (OLED_font2);
+		rprintfInit(OLED_font2);
 
-		SSD1306_GotoXY(0, 32+10);
-		if ( temp2 == 3)
-			printf ("3>");
+		SSD1306_GotoXY(0, 32 + 10);
+		if (temp2 == 3)
+			printf("3>");
 		else
-			printf ("3 ");
+			printf("3 ");
 
-		if (LoraRX [3].RSSI != 0) 	// есть какое-то измеренное значение
-			{
-				if ( LoraRX [3].RSSI >= -140) // если уровень больше -140, рисуем
-					{
-						if ( LoraRX [3].RSSI > -55 )
-							SSD1306_DrawFilledRectangle( 24, 31+21, 85, 5, SSD1306_COLOR_WHITE );  // максимум, ограничение
-						else
-						{
-							SSD1306_DrawRectangle( 24, 31+21, 85, 5, SSD1306_COLOR_WHITE );
-							SSD1306_DrawFilledRectangle( 24, 31+21, 85 + (55 + LoraRX [3].RSSI) , 5, SSD1306_COLOR_WHITE );  // уровень RSSI ( от -55 до -140 дБм )
-						}
-					}
-
-				if ( LoraRX [3].RSSI <= -100) // если 3 цифры в числе
-					SSD1306_GotoXY(18, 31+11);
-				else
-					SSD1306_GotoXY(25, 31+11); // если 2 цифры в числе
-
-				rprintfInit (OLED_font1);
-				printf ("%d dBm", LoraRX [3].RSSI);
-			}
-		else
-			{
-				SSD1306_GotoXY(25, 31+11); //
-				rprintfInit (OLED_font1);
-				printf ("Fail!");
-			}
-
-		if (LoraRX [3].Power > 0)
+		if (LoraRX[3].RSSI != 0) // РµСЃС‚СЊ РєР°РєРѕРµ-С‚Рѕ РёР·РјРµСЂРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 		{
-			SSD1306_GotoXY(80, 31+11); // мощность передатчика
-			printf("P%d", LoraRX [3].Power);
-			SSD1306_GotoXY(113, 31+11+10); // счетчик пакетов
-			printf("%02X", LoraRX [3].CounterTxP);
+			if (LoraRX[3].RSSI >= -140) // РµСЃР»Рё СѓСЂРѕРІРµРЅСЊ Р±РѕР»СЊС€Рµ -140, СЂРёСЃСѓРµРј
+			{
+				if (LoraRX[3].RSSI > -55)
+					SSD1306_DrawFilledRectangle(24, 31 + 21, 85, 5, SSD1306_COLOR_WHITE); // РјР°РєСЃРёРјСѓРј, РѕРіСЂР°РЅРёС‡РµРЅРёРµ
+				else
+				{
+					SSD1306_DrawRectangle(24, 31 + 21, 85, 5, SSD1306_COLOR_WHITE);
+					SSD1306_DrawFilledRectangle(24, 31 + 21, 85 + (55 + LoraRX[3].RSSI), 5, SSD1306_COLOR_WHITE); // СѓСЂРѕРІРµРЅСЊ RSSI ( РѕС‚ -55 РґРѕ -140 РґР‘Рј )
+				}
+			}
+
+			if (LoraRX[3].RSSI <= -100) // РµСЃР»Рё 3 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+				SSD1306_GotoXY(18, 31 + 11);
+			else
+				SSD1306_GotoXY(25, 31 + 11); // РµСЃР»Рё 2 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+
+			rprintfInit(OLED_font1);
+			printf("%d dBm", LoraRX[3].RSSI);
+		}
+		else
+		{
+			SSD1306_GotoXY(25, 31 + 11); //
+			rprintfInit(OLED_font1);
+			printf("Fail!");
 		}
 
-		rprintfInit (OLED_font1);
+		if (LoraRX[3].Power > 0)
+		{
+			SSD1306_GotoXY(80, 31 + 11); // РјРѕС‰РЅРѕСЃС‚СЊ РїРµСЂРµРґР°С‚С‡РёРєР°
+			printf("P%d", LoraRX[3].Power);
+			SSD1306_GotoXY(113, 31 + 11 + 10); // СЃС‡РµС‚С‡РёРє РїР°РєРµС‚РѕРІ
+			printf("%02X", LoraRX[3].CounterTxP);
+		}
 
-		SSD1306_GotoXY(25, 31+0);
+		rprintfInit(OLED_font1);
+
+		SSD1306_GotoXY(25, 31 + 0);
 		if (distance1_2_3 < 100000)
-			{
+		{
 			temp = distance1_2_3 * 10;
-			printf ("%d.%dm", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
-			}
+			printf("%d.%dm", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
+		}
 		else
-			{
-			printf ("---.-m" ); // расстояние не определено
-			}
-		SSD1306_GotoXY(71, 31+0);
-		Time_Display (TimesOld[3]);
+		{
+			printf("---.-m"); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РЅРµ РѕРїСЂРµРґРµР»РµРЅРѕ
+		}
+		SSD1306_GotoXY(71, 31 + 0);
+		Time_Display(TimesOld[3]);
 
-		// батарейка
-		if ( structBuffer[3].Vacc != 0)
+		// Р±Р°С‚Р°СЂРµР№РєР°
+		if (structBuffer[3].Vacc != 0)
 		{
 			X_bat = 110;
-			Y_bat = 31+11;
-			SSD1306_DrawRectangle(0+X_bat, 0+Y_bat, 14, 7, SSD1306_COLOR_WHITE );
-			SSD1306_DrawFilledRectangle(15+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
+			Y_bat = 31 + 11;
+			SSD1306_DrawRectangle(0 + X_bat, 0 + Y_bat, 14, 7, SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledRectangle(15 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
 			VaccAvgTemp = structBuffer[3].Vacc;
-			if (VaccAvgTemp >= 3500)	SSD1306_DrawFilledRectangle(2+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3690)	SSD1306_DrawFilledRectangle(X_bat+2+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3780)	SSD1306_DrawFilledRectangle(X_bat+2+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3850)	SSD1306_DrawFilledRectangle(X_bat+2+3+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
+			if (VaccAvgTemp >= 3500)
+				SSD1306_DrawFilledRectangle(2 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3690)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3780)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3850)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
 		}
 	}
 
-//------------------------------------------------------------------ 3 ------------------------------------------------------------------------------------------
+	//------------------------------------------------------------------ 3 ------------------------------------------------------------------------------------------
 	if (NumberDev == 3)
 	{
-		rprintfInit (OLED_font2);
+		rprintfInit(OLED_font2);
 
 		SSD1306_GotoXY(0, 10);
-		if ( temp2 == 1)
-			printf ("1>");
+		if (temp2 == 1)
+			printf("1>");
 		else
-			printf ("1 ");
+			printf("1 ");
 
-		if (LoraRX [1].RSSI != 0) 	// есть какое-то измеренное значение
-			{
-				if ( LoraRX [1].RSSI >= -140) // если уровень больше -140, рисуем
-					{
-						if ( LoraRX [1].RSSI > -55 )
-							SSD1306_DrawFilledRectangle( 24, 21, 85, 5, SSD1306_COLOR_WHITE );  // максимум, ограничение
-						else
-						{
-							SSD1306_DrawRectangle( 24, 21, 85, 5, SSD1306_COLOR_WHITE );
-							SSD1306_DrawFilledRectangle( 24, 21, 85 + (55 + LoraRX [1].RSSI) , 5, SSD1306_COLOR_WHITE );  // уровень RSSI ( от -55 до -140 дБм )
-						}
-					}
-
-				if ( LoraRX [1].RSSI <= -100) // если 3 цифры в числе
-					SSD1306_GotoXY(18, 11);
-				else
-					SSD1306_GotoXY(25, 11); // если 2 цифры в числе
-
-				rprintfInit (OLED_font1);
-				printf ("%d dBm ", LoraRX [1].RSSI );
-			}
-		else
-			{
-				SSD1306_GotoXY(25, 0+11); //
-				rprintfInit (OLED_font1);
-				printf ("Fail!");
-			}
-
-		if (LoraRX [1].Power > 0)
+		if (LoraRX[1].RSSI != 0) // РµСЃС‚СЊ РєР°РєРѕРµ-С‚Рѕ РёР·РјРµСЂРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 		{
-			SSD1306_GotoXY(80, 11); // мощность передатчика
-			printf("P%d", LoraRX [1].Power);
-			SSD1306_GotoXY(113, 11+10); // счетчик пакетов
-			printf("%02X", LoraRX [1].CounterTxP);
+			if (LoraRX[1].RSSI >= -140) // РµСЃР»Рё СѓСЂРѕРІРµРЅСЊ Р±РѕР»СЊС€Рµ -140, СЂРёСЃСѓРµРј
+			{
+				if (LoraRX[1].RSSI > -55)
+					SSD1306_DrawFilledRectangle(24, 21, 85, 5, SSD1306_COLOR_WHITE); // РјР°РєСЃРёРјСѓРј, РѕРіСЂР°РЅРёС‡РµРЅРёРµ
+				else
+				{
+					SSD1306_DrawRectangle(24, 21, 85, 5, SSD1306_COLOR_WHITE);
+					SSD1306_DrawFilledRectangle(24, 21, 85 + (55 + LoraRX[1].RSSI), 5, SSD1306_COLOR_WHITE); // СѓСЂРѕРІРµРЅСЊ RSSI ( РѕС‚ -55 РґРѕ -140 РґР‘Рј )
+				}
+			}
+
+			if (LoraRX[1].RSSI <= -100) // РµСЃР»Рё 3 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+				SSD1306_GotoXY(18, 11);
+			else
+				SSD1306_GotoXY(25, 11); // РµСЃР»Рё 2 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+
+			rprintfInit(OLED_font1);
+			printf("%d dBm ", LoraRX[1].RSSI);
 		}
-		rprintfInit (OLED_font1);
+		else
+		{
+			SSD1306_GotoXY(25, 0 + 11); //
+			rprintfInit(OLED_font1);
+			printf("Fail!");
+		}
+
+		if (LoraRX[1].Power > 0)
+		{
+			SSD1306_GotoXY(80, 11); // РјРѕС‰РЅРѕСЃС‚СЊ РїРµСЂРµРґР°С‚С‡РёРєР°
+			printf("P%d", LoraRX[1].Power);
+			SSD1306_GotoXY(113, 11 + 10); // СЃС‡РµС‚С‡РёРє РїР°РєРµС‚РѕРІ
+			printf("%02X", LoraRX[1].CounterTxP);
+		}
+		rprintfInit(OLED_font1);
 
 		SSD1306_GotoXY(25, 0);
 		if (distance1_1_3 < 100000)
-			{
+		{
 			temp = distance1_1_3 * 10;
-			printf ("%d.%dm", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
-			}
+			printf("%d.%dm", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
+		}
 		else
-			{
-			printf ("---.-m" ); // расстояние не определено
-			}
+		{
+			printf("---.-m"); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РЅРµ РѕРїСЂРµРґРµР»РµРЅРѕ
+		}
 
 		SSD1306_GotoXY(71, 0);
-		Time_Display (TimesOld[1]);
+		Time_Display(TimesOld[1]);
 
-		// батарейка
-		if ( structBuffer[1].Vacc != 0)
+		// Р±Р°С‚Р°СЂРµР№РєР°
+		if (structBuffer[1].Vacc != 0)
 		{
 			X_bat = 110;
 			Y_bat = 11;
-			SSD1306_DrawRectangle(0+X_bat, 0+Y_bat, 14, 7, SSD1306_COLOR_WHITE );
-			SSD1306_DrawFilledRectangle(15+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
+			SSD1306_DrawRectangle(0 + X_bat, 0 + Y_bat, 14, 7, SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledRectangle(15 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
 			VaccAvgTemp = structBuffer[1].Vacc;
-			if (VaccAvgTemp >= 3500)	SSD1306_DrawFilledRectangle(2+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3690)	SSD1306_DrawFilledRectangle(X_bat+2+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3780)	SSD1306_DrawFilledRectangle(X_bat+2+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3850)	SSD1306_DrawFilledRectangle(X_bat+2+3+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
+			if (VaccAvgTemp >= 3500)
+				SSD1306_DrawFilledRectangle(2 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3690)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3780)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3850)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
 		}
-		rprintfInit (OLED_font2);
+		rprintfInit(OLED_font2);
 
 		//---------------------------------------------------------------
-		SSD1306_GotoXY(0, 32+6);
-		if ( temp2 == 2)
-			printf ("2>");
+		SSD1306_GotoXY(0, 32 + 6);
+		if (temp2 == 2)
+			printf("2>");
 		else
-			printf ("2 ");
+			printf("2 ");
 
-		if (LoraRX [2].RSSI != 0) 	// есть какое-то измеренное значение
-			{
-				if ( LoraRX [2].RSSI >= -140) // если уровень больше -140, рисуем
-					{
-						if ( LoraRX [2].RSSI > -55 )
-							SSD1306_DrawFilledRectangle( 24, 31+21, 85, 5, SSD1306_COLOR_WHITE );  // максимум, ограничение
-						else
-						{
-							SSD1306_DrawRectangle( 24, 31+21, 85, 5, SSD1306_COLOR_WHITE );
-							SSD1306_DrawFilledRectangle( 24, 31+21, 85 + (55 + LoraRX [2].RSSI) , 5, SSD1306_COLOR_WHITE );  // уровень RSSI ( от -55 до -140 дБм )
-						}
-					}
-
-				if ( LoraRX [2].RSSI <= -100) // если 3 цифры в числе
-					SSD1306_GotoXY(18, 31+11);
-				else
-					SSD1306_GotoXY(25, 31+11); // если 2 цифры в числе
-
-				rprintfInit (OLED_font1);
-				printf ("%d dBm", LoraRX [2].RSSI);
-			}
-		else
-			{
-				SSD1306_GotoXY(25, 31+11); //
-				rprintfInit (OLED_font1);
-				printf ("Fail!");
-			}
-
-		if (LoraRX [2].Power > 0)
+		if (LoraRX[2].RSSI != 0) // РµСЃС‚СЊ РєР°РєРѕРµ-С‚Рѕ РёР·РјРµСЂРµРЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 		{
-			SSD1306_GotoXY(80, 31+11); // мощность передатчика
-			printf("P%d", LoraRX [2].Power);
-			SSD1306_GotoXY(113, 31+11+10); // счетчик пакетов
-			printf("%02X", LoraRX [2].CounterTxP);
+			if (LoraRX[2].RSSI >= -140) // РµСЃР»Рё СѓСЂРѕРІРµРЅСЊ Р±РѕР»СЊС€Рµ -140, СЂРёСЃСѓРµРј
+			{
+				if (LoraRX[2].RSSI > -55)
+					SSD1306_DrawFilledRectangle(24, 31 + 21, 85, 5, SSD1306_COLOR_WHITE); // РјР°РєСЃРёРјСѓРј, РѕРіСЂР°РЅРёС‡РµРЅРёРµ
+				else
+				{
+					SSD1306_DrawRectangle(24, 31 + 21, 85, 5, SSD1306_COLOR_WHITE);
+					SSD1306_DrawFilledRectangle(24, 31 + 21, 85 + (55 + LoraRX[2].RSSI), 5, SSD1306_COLOR_WHITE); // СѓСЂРѕРІРµРЅСЊ RSSI ( РѕС‚ -55 РґРѕ -140 РґР‘Рј )
+				}
+			}
+
+			if (LoraRX[2].RSSI <= -100) // РµСЃР»Рё 3 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+				SSD1306_GotoXY(18, 31 + 11);
+			else
+				SSD1306_GotoXY(25, 31 + 11); // РµСЃР»Рё 2 С†РёС„СЂС‹ РІ С‡РёСЃР»Рµ
+
+			rprintfInit(OLED_font1);
+			printf("%d dBm", LoraRX[2].RSSI);
+		}
+		else
+		{
+			SSD1306_GotoXY(25, 31 + 11); //
+			rprintfInit(OLED_font1);
+			printf("Fail!");
 		}
 
-		rprintfInit (OLED_font1);
+		if (LoraRX[2].Power > 0)
+		{
+			SSD1306_GotoXY(80, 31 + 11); // РјРѕС‰РЅРѕСЃС‚СЊ РїРµСЂРµРґР°С‚С‡РёРєР°
+			printf("P%d", LoraRX[2].Power);
+			SSD1306_GotoXY(113, 31 + 11 + 10); // СЃС‡РµС‚С‡РёРє РїР°РєРµС‚РѕРІ
+			printf("%02X", LoraRX[2].CounterTxP);
+		}
 
-		SSD1306_GotoXY(25, 31+0);
+		rprintfInit(OLED_font1);
+
+		SSD1306_GotoXY(25, 31 + 0);
 		if (distance1_2_3 < 100000)
-			{
+		{
 			temp = distance1_2_3 * 10;
-			printf ("%d.%dm", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
-			}
+			printf("%d.%dm", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
+		}
 		else
-			{
-			printf ("---.-m" ); // расстояние не определено
-			}
-		SSD1306_GotoXY(71, 31+0);
-		Time_Display (TimesOld[2]);
+		{
+			printf("---.-m"); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РЅРµ РѕРїСЂРµРґРµР»РµРЅРѕ
+		}
+		SSD1306_GotoXY(71, 31 + 0);
+		Time_Display(TimesOld[2]);
 
-		// батарейка
-		if ( structBuffer[2].Vacc != 0)
+		// Р±Р°С‚Р°СЂРµР№РєР°
+		if (structBuffer[2].Vacc != 0)
 		{
 			X_bat = 110;
-			Y_bat = 31+11;
-			SSD1306_DrawRectangle(0+X_bat, 0+Y_bat, 14, 7, SSD1306_COLOR_WHITE );
-			SSD1306_DrawFilledRectangle(15+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
+			Y_bat = 31 + 11;
+			SSD1306_DrawRectangle(0 + X_bat, 0 + Y_bat, 14, 7, SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledRectangle(15 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
 			VaccAvgTemp = structBuffer[2].Vacc;
-			if (VaccAvgTemp >= 3500)	SSD1306_DrawFilledRectangle(2+X_bat, 2+Y_bat, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3690)	SSD1306_DrawFilledRectangle(X_bat+2+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3780)	SSD1306_DrawFilledRectangle(X_bat+2+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
-			if (VaccAvgTemp >= 3850)	SSD1306_DrawFilledRectangle(X_bat+2+3+3+3, Y_bat+2, 1, 3, SSD1306_COLOR_WHITE );
+			if (VaccAvgTemp >= 3500)
+				SSD1306_DrawFilledRectangle(2 + X_bat, 2 + Y_bat, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3690)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3780)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
+			if (VaccAvgTemp >= 3850)
+				SSD1306_DrawFilledRectangle(X_bat + 2 + 3 + 3 + 3, Y_bat + 2, 1, 3, SSD1306_COLOR_WHITE);
 		}
 	}
-
-
 }
 
-// расстояния между маяками
-void Display2Release	(void)
+// СЂР°СЃСЃС‚РѕСЏРЅРёСЏ РјРµР¶РґСѓ РјР°СЏРєР°РјРё
+void Display2Release(void)
 {
 	u32 temp;
 
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(0, 0);
-	printf ("    Distance: ");
+	printf("    Distance: ");
 
-	rprintfInit (OLED_font2); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font2); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 	SSD1306_GotoXY(0, 10);
 	temp = distance1_1_2 * 10;
-	printf ("1-2:%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
+	printf("1-2:%d.%d m", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 	SSD1306_GotoXY(0, 27);
 	temp = distance1_1_3 * 10;
-	printf ("1-3:%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
+	printf("1-3:%d.%d m", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 	SSD1306_GotoXY(0, 44);
 	temp = distance1_2_3 * 10;
-	printf ("2-3:%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
-
+	printf("2-3:%d.%d m", temp / 10, temp % 10); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 }
 
-// информация о спутниках
-void Display3Release	(void)
+// РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ СЃРїСѓС‚РЅРёРєР°С…
+void Display3Release(void)
 {
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit(OLED_font1); // РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
-	for (i=0; i<SatNumGPS; i++) 	// перебираем все видимые спутники GPS
+	for (i = 0; i < SatNumGPS; i++) // РїРµСЂРµР±РёСЂР°РµРј РІСЃРµ РІРёРґРёРјС‹Рµ СЃРїСѓС‚РЅРёРєРё GPS
 	{
-		SatIDGPS [i] = (GPSFixData.Sats[i][0][0] - 0x30) * 10 + (GPSFixData.Sats[i][0][1] - 0x30) * 1 ;
+		SatIDGPS[i] = (GPSFixData.Sats[i][0][0] - 0x30) * 10 + (GPSFixData.Sats[i][0][1] - 0x30) * 1;
 
-		for (j=0; j<3; j++)
+		for (j = 0; j < 3; j++)
 		{
-			if ( GPSFixData.Sats[i][3][j] == '\0' ) 	// считаем сколько цифр в числе S/N
+			if (GPSFixData.Sats[i][3][j] == '\0') // СЃС‡РёС‚Р°РµРј СЃРєРѕР»СЊРєРѕ С†РёС„СЂ РІ С‡РёСЃР»Рµ S/N
 				break;
 		}
 
-		if (j==3) 		// три цифры
+		if (j == 3) // С‚СЂРё С†РёС„СЂС‹
 		{
-			SatLevelsGPS [i] = (GPSFixData.Sats[i][3][0] - 0x30) * 100 + (GPSFixData.Sats[i][3][1] - 0x30) * 10 + (GPSFixData.Sats[i][3][2] - 0x30) * 1 ;
+			SatLevelsGPS[i] = (GPSFixData.Sats[i][3][0] - 0x30) * 100 + (GPSFixData.Sats[i][3][1] - 0x30) * 10 + (GPSFixData.Sats[i][3][2] - 0x30) * 1;
 		}
-		else if (j==2) 	// две цифры
+		else if (j == 2) // РґРІРµ С†РёС„СЂС‹
 		{
-			SatLevelsGPS [i] = (GPSFixData.Sats[i][3][0] - 0x30) * 10 + (GPSFixData.Sats[i][3][1] - 0x30) * 1 ;
+			SatLevelsGPS[i] = (GPSFixData.Sats[i][3][0] - 0x30) * 10 + (GPSFixData.Sats[i][3][1] - 0x30) * 1;
 		}
-		else if (j==1) 	// одна цифра
+		else if (j == 1) // РѕРґРЅР° С†РёС„СЂР°
 		{
-			SatLevelsGPS [i] = GPSFixData.Sats[i][3][0] - 0x30 ;
+			SatLevelsGPS[i] = GPSFixData.Sats[i][3][0] - 0x30;
 		}
-//printf ("%d %d;", i, j);
+		// printf ("%d %d;", i, j);
 	}
 
-	SatSummGPS = 0; 			// сумма уровней сигналов со спутников GPS
-	for (i=0; i<SatNumGPS; i++)
+	SatSummGPS = 0; // СЃСѓРјРјР° СѓСЂРѕРІРЅРµР№ СЃРёРіРЅР°Р»РѕРІ СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ GPS
+	for (i = 0; i < SatNumGPS; i++)
 	{
 		SatSummGPS += SatLevelsGPS[i];
 	}
 
-	// ---------------------------- GLONASS спутники -------------------------------------------
-	for (i=0; i<SatNumGLO; i++) 	// перебираем все видимые спутники GPS
+	// ---------------------------- GLONASS СЃРїСѓС‚РЅРёРєРё -------------------------------------------
+	for (i = 0; i < SatNumGLO; i++) // РїРµСЂРµР±РёСЂР°РµРј РІСЃРµ РІРёРґРёРјС‹Рµ СЃРїСѓС‚РЅРёРєРё GPS
+	{
+		SatIDGLO[i] = (GPSFixData.SatsGLO[i][0][0] - 0x30) * 10 + (GPSFixData.SatsGLO[i][0][1] - 0x30) * 1;
+
+		for (j = 0; j < 3; j++)
 		{
-			SatIDGLO [i] = (GPSFixData.SatsGLO[i][0][0] - 0x30) * 10 + (GPSFixData.SatsGLO[i][0][1] - 0x30) * 1 ;
-
-			for (j=0; j<3; j++)
-			{
-				if ( GPSFixData.SatsGLO[i][3][j] == '\0' ) 	// считаем сколько цифр в числе S/N
-					break;
-			}
-
-			if (j==3) 		// три цифры
-			{
-				SatLevelsGLO [i] = (GPSFixData.SatsGLO[i][3][0] - 0x30) * 100 + (GPSFixData.SatsGLO[i][3][1] - 0x30) * 10 + (GPSFixData.SatsGLO[i][3][2] - 0x30) * 1 ;
-			}
-			else if (j==2) 	// две цифры
-			{
-				SatLevelsGLO [i] = (GPSFixData.SatsGLO[i][3][0] - 0x30) * 10 + (GPSFixData.SatsGLO[i][3][1] - 0x30) * 1 ;
-			}
-			else if (j==1) 	// одна цифра
-			{
-				SatLevelsGLO [i] = GPSFixData.SatsGLO[i][3][0] - 0x30 ;
-			}
-	//printf ("%d %d;", i, j);
+			if (GPSFixData.SatsGLO[i][3][j] == '\0') // СЃС‡РёС‚Р°РµРј СЃРєРѕР»СЊРєРѕ С†РёС„СЂ РІ С‡РёСЃР»Рµ S/N
+				break;
 		}
 
-		SatSummGLO = 0; 			 // сумма уровней сигналов со спутников GLONASS
-		for (i=0; i<SatNumGLO; i++)
+		if (j == 3) // С‚СЂРё С†РёС„СЂС‹
 		{
-			SatSummGLO += SatLevelsGLO[i];
+			SatLevelsGLO[i] = (GPSFixData.SatsGLO[i][3][0] - 0x30) * 100 + (GPSFixData.SatsGLO[i][3][1] - 0x30) * 10 + (GPSFixData.SatsGLO[i][3][2] - 0x30) * 1;
 		}
+		else if (j == 2) // РґРІРµ С†РёС„СЂС‹
+		{
+			SatLevelsGLO[i] = (GPSFixData.SatsGLO[i][3][0] - 0x30) * 10 + (GPSFixData.SatsGLO[i][3][1] - 0x30) * 1;
+		}
+		else if (j == 1) // РѕРґРЅР° С†РёС„СЂР°
+		{
+			SatLevelsGLO[i] = GPSFixData.SatsGLO[i][3][0] - 0x30;
+		}
+		// printf ("%d %d;", i, j);
+	}
+
+	SatSummGLO = 0; // СЃСѓРјРјР° СѓСЂРѕРІРЅРµР№ СЃРёРіРЅР°Р»РѕРІ СЃРѕ СЃРїСѓС‚РЅРёРєРѕРІ GLONASS
+	for (i = 0; i < SatNumGLO; i++)
+	{
+		SatSummGLO += SatLevelsGLO[i];
+	}
 	//---------------------------------------------------------------------------------------------
 
-	//rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	// rprintfInit (OLED_font1); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 	SSD1306_GotoXY(0, 0);
-	printf ("GPS:%d/%d", SatFixGPS, SatNumGPS );  		// количество найденных при парсинге спутников
+	printf("GPS:%d/%d", SatFixGPS, SatNumGPS); // РєРѕР»РёС‡РµСЃС‚РІРѕ РЅР°Р№РґРµРЅРЅС‹С… РїСЂРё РїР°СЂСЃРёРЅРіРµ СЃРїСѓС‚РЅРёРєРѕРІ
 	SSD1306_GotoXY(66, 0);
-	printf ("GLO:%d/%d", SatFixGLO, SatNumGLO );  	// количество найденных при парсинге спутников
+	printf("GLO:%d/%d", SatFixGLO, SatNumGLO); // РєРѕР»РёС‡РµСЃС‚РІРѕ РЅР°Р№РґРµРЅРЅС‹С… РїСЂРё РїР°СЂСЃРёРЅРіРµ СЃРїСѓС‚РЅРёРєРѕРІ
 
-	// считаем сумм использованных спутников GPS и рисуем уровни
+	// СЃС‡РёС‚Р°РµРј СЃСѓРјРј РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GPS Рё СЂРёСЃСѓРµРј СѓСЂРѕРІРЅРё
 	SatSummUsedGPS = 0;
-	for (i=0; i<SatNumGPS; i++)
+	for (i = 0; i < SatNumGPS; i++)
 	{
-		for (j=0; j<12; j++) // перебираем все спутники из решения, сравниваем номера
+		for (j = 0; j < 12; j++) // РїРµСЂРµР±РёСЂР°РµРј РІСЃРµ СЃРїСѓС‚РЅРёРєРё РёР· СЂРµС€РµРЅРёСЏ, СЃСЂР°РІРЅРёРІР°РµРј РЅРѕРјРµСЂР°
 		{
-			if ( SatUsedGPS [j] == SatIDGPS [i] )
+			if (SatUsedGPS[j] == SatIDGPS[i])
 			{
-				SatSummUsedGPS += SatLevelsGPS[i];  		// сумма S/N спутников, используемых в решении
-				SSD1306_DrawFilledRectangle(0 + i*4, 63-SatLevelsGPS[i], 2, SatLevelsGPS[i], SSD1306_COLOR_WHITE);  // спутники, используемые в решении - сплошным белым
+				SatSummUsedGPS += SatLevelsGPS[i];																	   // СЃСѓРјРјР° S/N СЃРїСѓС‚РЅРёРєРѕРІ, РёСЃРїРѕР»СЊР·СѓРµРјС‹С… РІ СЂРµС€РµРЅРёРё
+				SSD1306_DrawFilledRectangle(0 + i * 4, 63 - SatLevelsGPS[i], 2, SatLevelsGPS[i], SSD1306_COLOR_WHITE); // СЃРїСѓС‚РЅРёРєРё, РёСЃРїРѕР»СЊР·СѓРµРјС‹Рµ РІ СЂРµС€РµРЅРёРё - СЃРїР»РѕС€РЅС‹Рј Р±РµР»С‹Рј
 			}
 			else
-				SSD1306_DrawRectangle(0 + i*4, 63-SatLevelsGPS[i], 2, SatLevelsGPS[i], SSD1306_COLOR_WHITE);		  // спутники, неиспользуемые в решении - пустыми прямоугольниками
+				SSD1306_DrawRectangle(0 + i * 4, 63 - SatLevelsGPS[i], 2, SatLevelsGPS[i], SSD1306_COLOR_WHITE); // СЃРїСѓС‚РЅРёРєРё, РЅРµРёСЃРїРѕР»СЊР·СѓРµРјС‹Рµ РІ СЂРµС€РµРЅРёРё - РїСѓСЃС‚С‹РјРё РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°РјРё
 		}
 	}
-	// считаем сумм использованных спутников GLONASS и рисуем уровни
+	// СЃС‡РёС‚Р°РµРј СЃСѓРјРј РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… СЃРїСѓС‚РЅРёРєРѕРІ GLONASS Рё СЂРёСЃСѓРµРј СѓСЂРѕРІРЅРё
 	SatSummUsedGLO = 0;
-	for (i=0; i<SatNumGLO; i++)
+	for (i = 0; i < SatNumGLO; i++)
 	{
-		for (j=0; j<12; j++) // перебираем все спутники из решения, сравниваем номера
+		for (j = 0; j < 12; j++) // РїРµСЂРµР±РёСЂР°РµРј РІСЃРµ СЃРїСѓС‚РЅРёРєРё РёР· СЂРµС€РµРЅРёСЏ, СЃСЂР°РІРЅРёРІР°РµРј РЅРѕРјРµСЂР°
 		{
-			if ( SatUsedGLO [j] == SatIDGLO [i] )
+			if (SatUsedGLO[j] == SatIDGLO[i])
 			{
-				SatSummUsedGLO += SatLevelsGLO[i];  		// сумма S/N спутников, используемых в решении
-				SSD1306_DrawFilledRectangle(66 + i*4, 63-SatLevelsGLO[i], 2, SatLevelsGLO[i], SSD1306_COLOR_WHITE);  // спутники, используемые в решении - сплошным белым
+				SatSummUsedGLO += SatLevelsGLO[i];																		// СЃСѓРјРјР° S/N СЃРїСѓС‚РЅРёРєРѕРІ, РёСЃРїРѕР»СЊР·СѓРµРјС‹С… РІ СЂРµС€РµРЅРёРё
+				SSD1306_DrawFilledRectangle(66 + i * 4, 63 - SatLevelsGLO[i], 2, SatLevelsGLO[i], SSD1306_COLOR_WHITE); // СЃРїСѓС‚РЅРёРєРё, РёСЃРїРѕР»СЊР·СѓРµРјС‹Рµ РІ СЂРµС€РµРЅРёРё - СЃРїР»РѕС€РЅС‹Рј Р±РµР»С‹Рј
 			}
 			else
-				SSD1306_DrawRectangle(66 + i*4, 63-SatLevelsGLO[i], 2, SatLevelsGLO[i], SSD1306_COLOR_WHITE);		  // спутники, неиспользуемые в решении - пустыми прямоугольниками
+				SSD1306_DrawRectangle(66 + i * 4, 63 - SatLevelsGLO[i], 2, SatLevelsGLO[i], SSD1306_COLOR_WHITE); // СЃРїСѓС‚РЅРёРєРё, РЅРµРёСЃРїРѕР»СЊР·СѓРµРјС‹Рµ РІ СЂРµС€РµРЅРёРё - РїСѓСЃС‚С‹РјРё РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°РјРё
 		}
 	}
 
-	//SSD1306_GotoXY(0, 10);
-	//printf ("S=%d/%d", SatSummUsedGPS, SatSummGPS);
+	// SSD1306_GotoXY(0, 10);
+	// printf ("S=%d/%d", SatSummUsedGPS, SatSummGPS);
 
-	//SSD1306_GotoXY(66, 10);
-	//printf ("S=%d/%d", SatSummUsedGLO, SatSummGLO);
+	// SSD1306_GotoXY(66, 10);
+	// printf ("S=%d/%d", SatSummUsedGLO, SatSummGLO);
 
 	SSD1306_GotoXY(0, 10);
-	printf ("SN:%ddB", SatSummUsedGPS + SatSummUsedGLO);
+	printf("SN:%ddB", SatSummUsedGPS + SatSummUsedGLO);
 	SSD1306_GotoXY(66, 10);
-	printf ("TF:%d s", TTFF);
-
+	printf("TF:%d s", TTFF);
 }
 /*void Display14	(void)
 {
 	u32 temp;
 
 	SSD1306_Fill(SSD1306_COLOR_BLACK);
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit (OLED_font1); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 //	SSD1306_GotoXY(0, 0);
 //	printf (" sin(90) * 100 =");
@@ -3323,57 +3316,57 @@ void Display3Release	(void)
 //	printf (" rad = %d ", (u32)(rad*1000000.0) );
 
 
-	if (counterMaxRssiReset > 0) // другой маяк виден
+	if (counterMaxRssiReset > 0) // РґСЂСѓРіРѕР№ РјР°СЏРє РІРёРґРµРЅ
 	{
 		SSD1306_GotoXY(10, 0);
-		rprintfInit (OLED_font2); 	// вывод на OLED дисплей
+		rprintfInit (OLED_font2); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
-		if ( structBuffer[1].Latitude == 0 || structBuffer[2].Latitude == 0 ) // если координата одного из маяков не определена
+		if ( structBuffer[1].Latitude == 0 || structBuffer[2].Latitude == 0 ) // РµСЃР»Рё РєРѕРѕСЂРґРёРЅР°С‚Р° РѕРґРЅРѕРіРѕ РёР· РјР°СЏРєРѕРІ РЅРµ РѕРїСЂРµРґРµР»РµРЅР°
 			printf ("--- m" );
 		else
 		{
 			temp = distance1 * 10;
-			printf ("%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
+			printf ("%d.%d m", temp / 10,  temp % 10 ); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 		}
 
 		SSD1306_GotoXY(10, 20);
-		rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+		rprintfInit (OLED_font1); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
-		if ( structBuffer[1].Latitude == 0 || structBuffer[2].Latitude == 0 ) // если координата одного из маяков не определена
+		if ( structBuffer[1].Latitude == 0 || structBuffer[2].Latitude == 0 ) // РµСЃР»Рё РєРѕРѕСЂРґРёРЅР°С‚Р° РѕРґРЅРѕРіРѕ РёР· РјР°СЏРєРѕРІ РЅРµ РѕРїСЂРµРґРµР»РµРЅР°
 			printf ("--- m" );
 		else
 		{
 			temp = distance2 * 10;
-			printf ("%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
+			printf ("%d.%d m", temp / 10,  temp % 10 ); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 		}
 
 	}
-	else // маяк не виден , показываем расстояние от текущего местоположения до последней принятой точки
+	else // РјР°СЏРє РЅРµ РІРёРґРµРЅ , РїРѕРєР°Р·С‹РІР°РµРј СЂР°СЃСЃС‚РѕСЏРЅРёРµ РѕС‚ С‚РµРєСѓС‰РµРіРѕ РјРµСЃС‚РѕРїРѕР»РѕР¶РµРЅРёСЏ РґРѕ РїРѕСЃР»РµРґРЅРµР№ РїСЂРёРЅСЏС‚РѕР№ С‚РѕС‡РєРё
 	{
 		SSD1306_GotoXY(10, 0);
-		rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+		rprintfInit (OLED_font1); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
-		if ( structBuffer[1].Latitude == 0 || structBuffer[2].Latitude == 0 ) // если координата одного из маяков не определена
+		if ( structBuffer[1].Latitude == 0 || structBuffer[2].Latitude == 0 ) // РµСЃР»Рё РєРѕРѕСЂРґРёРЅР°С‚Р° РѕРґРЅРѕРіРѕ РёР· РјР°СЏРєРѕРІ РЅРµ РѕРїСЂРµРґРµР»РµРЅР°
 			printf ("--- m" );
 		else
 		{
 			temp = distance1 * 10;
-			printf ("%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
+			printf ("%d.%d m", temp / 10,  temp % 10 ); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 		}
 
 		SSD1306_GotoXY(10, 15);
-		rprintfInit (OLED_font2); 	// вывод на OLED дисплей
+		rprintfInit (OLED_font2); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
-		if ( structBuffer[1].Latitude == 0 || structBuffer[2].Latitude == 0 ) // если координата одного из маяков не определена
+		if ( structBuffer[1].Latitude == 0 || structBuffer[2].Latitude == 0 ) // РµСЃР»Рё РєРѕРѕСЂРґРёРЅР°С‚Р° РѕРґРЅРѕРіРѕ РёР· РјР°СЏРєРѕРІ РЅРµ РѕРїСЂРµРґРµР»РµРЅР°
 			printf ("--- m" );
 		else
 		{
 			temp = distance2 * 10;
-			printf ("%d.%d m", temp / 10,  temp % 10 ); // расстояние до маяка в метрах
+			printf ("%d.%d m", temp / 10,  temp % 10 ); // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РјР°СЏРєР° РІ РјРµС‚СЂР°С…
 		}
 	}
 
-	rprintfInit (OLED_font1); 	// вывод на OLED дисплей
+	rprintfInit (OLED_font1); 	// РІС‹РІРѕРґ РЅР° OLED РґРёСЃРїР»РµР№
 
 	SSD1306_GotoXY(112, 10);
 	if (counterTXDisplay > 0)
@@ -3390,7 +3383,7 @@ void Display3Release	(void)
 	//counter_AVG_1PPS
 
 	if ( flag_1PPS_AVG_OK == 0)
-	{ // градусник усреднения 1PPS
+	{ // РіСЂР°РґСѓСЃРЅРёРє СѓСЃСЂРµРґРЅРµРЅРёСЏ 1PPS
 	SSD1306_DrawRectangle (0, 58, 127, 5, SSD1306_COLOR_WHITE);
 	SSD1306_DrawFilledRectangle (0, 58, (127 * counter_AVG_1PPS) / AVG_TIM4 , 5, SSD1306_COLOR_WHITE);
 
@@ -3407,1530 +3400,1640 @@ void Display3Release	(void)
 }
 */
 
-void OLED_Putc1	(char c)  // вывод символа на дисплей. Шрифт 7x10 пикселей
+void OLED_Putc1(char c) // РІС‹РІРѕРґ СЃРёРјРІРѕР»Р° РЅР° РґРёСЃРїР»РµР№. РЁСЂРёС„С‚ 7x10 РїРёРєСЃРµР»РµР№
 {
-	SSD1306_Putc ( c, &Font_7x10, SSD1306_COLOR_WHITE );
+	SSD1306_Putc(c, &Font_7x10, SSD1306_COLOR_WHITE);
 }
-void OLED_Putc2	(char c)  // вывод символа на дисплей. Шрифт 11x18 пикселей
+void OLED_Putc2(char c) // РІС‹РІРѕРґ СЃРёРјРІРѕР»Р° РЅР° РґРёСЃРїР»РµР№. РЁСЂРёС„С‚ 11x18 РїРёРєСЃРµР»РµР№
 {
-	SSD1306_Putc ( c, &Font_11x18, SSD1306_COLOR_WHITE );
+	SSD1306_Putc(c, &Font_11x18, SSD1306_COLOR_WHITE);
 }
-void OLED_Putc3	(char c)  // вывод символа на дисплей. Шрифт 16x26 пикселей
+void OLED_Putc3(char c) // РІС‹РІРѕРґ СЃРёРјРІРѕР»Р° РЅР° РґРёСЃРїР»РµР№. РЁСЂРёС„С‚ 16x26 РїРёРєСЃРµР»РµР№
 {
-	SSD1306_Putc ( c, &Font_16x26, SSD1306_COLOR_WHITE );
+	SSD1306_Putc(c, &Font_16x26, SSD1306_COLOR_WHITE);
 }
 
-// -----------------  прием и парсинг данных с GPS модуля
-void ReceiveGPS (void)
+// -----------------  РїСЂРёРµРј Рё РїР°СЂСЃРёРЅРі РґР°РЅРЅС‹С… СЃ GPS РјРѕРґСѓР»СЏ
+void ReceiveGPS(void)
 {
-	u8 scan;	// счетчик для поиска GSV последовательностей
-	
-	if ( triggerTIM3Interrupt == 1 ) 	// проверка  - пришла посылка от GPS модуля
+	u8 scan; // СЃС‡РµС‚С‡РёРє РґР»СЏ РїРѕРёСЃРєР° GSV РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚РµР№
+
+	if (triggerTIM3Interrupt == 1) // РїСЂРѕРІРµСЂРєР°  - РїСЂРёС€Р»Р° РїРѕСЃС‹Р»РєР° РѕС‚ GPS РјРѕРґСѓР»СЏ
 	{
-		triggerTIM3Interrupt = 0; 		// сбрасываем флаг наличия данных в буфере
+		triggerTIM3Interrupt = 0; // СЃР±СЂР°СЃС‹РІР°РµРј С„Р»Р°Рі РЅР°Р»РёС‡РёСЏ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ
 
-    	countPacket ++ ;
+		countPacket++;
 
-
-		rprintfInit (Terminal);
-	#ifdef DebugGpsToUart1
+		rprintfInit(Terminal);
+#ifdef DebugGpsToUart1
 		printf("\n\r\n\r ------- NEW DATA ----------------------------------\n\r");
-	#endif
-		// Если буфер заполнился, начинаем искать и декодировать NMEA сентенции
-	//printf ("\n\r GPSBufWrPoint: %d ", GPSBufWrPoint); 	// текущее положение указателя записи в буфер
-		GPSBufWrPoint = 0; 				// сброс в 0, записываем следующую посылку с начала буфера
+#endif
+		// Р•СЃР»Рё Р±СѓС„РµСЂ Р·Р°РїРѕР»РЅРёР»СЃСЏ, РЅР°С‡РёРЅР°РµРј РёСЃРєР°С‚СЊ Рё РґРµРєРѕРґРёСЂРѕРІР°С‚СЊ NMEA СЃРµРЅС‚РµРЅС†РёРё
+		// printf ("\n\r GPSBufWrPoint: %d ", GPSBufWrPoint); 	// С‚РµРєСѓС‰РµРµ РїРѕР»РѕР¶РµРЅРёРµ СѓРєР°Р·Р°С‚РµР»СЏ Р·Р°РїРёСЃРё РІ Р±СѓС„РµСЂ
+		GPSBufWrPoint = 0; // СЃР±СЂРѕСЃ РІ 0, Р·Р°РїРёСЃС‹РІР°РµРј СЃР»РµРґСѓСЋС‰СѓСЋ РїРѕСЃС‹Р»РєСѓ СЃ РЅР°С‡Р°Р»Р° Р±СѓС„РµСЂР°
 
-		NMEA_Parser_GGA();						// GGA - основная сентенция, выдает координаты
-		NMEA_Parser_GSA_GPS();					// GSA - список GPS спутников в решении, DOP
+		NMEA_Parser_GGA();	   // GGA - РѕСЃРЅРѕРІРЅР°СЏ СЃРµРЅС‚РµРЅС†РёСЏ, РІС‹РґР°РµС‚ РєРѕРѕСЂРґРёРЅР°С‚С‹
+		NMEA_Parser_GSA_GPS(); // GSA - СЃРїРёСЃРѕРє GPS СЃРїСѓС‚РЅРёРєРѕРІ РІ СЂРµС€РµРЅРёРё, DOP
 
-		NMEA_Parser_GSA_GLO();					// GSA - список GLONASS спутников в решении
+		NMEA_Parser_GSA_GLO(); // GSA - СЃРїРёСЃРѕРє GLONASS СЃРїСѓС‚РЅРёРєРѕРІ РІ СЂРµС€РµРЅРёРё
 
-		NMEA_Parser_ZDA();      				// ZDA - выдает время и дату
-		GPSTimeSec = GetGPSTimeSec(); 			// парсинг времени, секунды текущих суток
-		GPSTimeMilliSec	= GetGPSTimeMilliSec(); // парсинг времени, миллисекунды
+		NMEA_Parser_ZDA();						// ZDA - РІС‹РґР°РµС‚ РІСЂРµРјСЏ Рё РґР°С‚Сѓ
+		GPSTimeSec = GetGPSTimeSec();			// РїР°СЂСЃРёРЅРі РІСЂРµРјРµРЅРё, СЃРµРєСѓРЅРґС‹ С‚РµРєСѓС‰РёС… СЃСѓС‚РѕРє
+		GPSTimeMilliSec = GetGPSTimeMilliSec(); // РїР°СЂСЃРёРЅРі РІСЂРµРјРµРЅРё, РјРёР»Р»РёСЃРµРєСѓРЅРґС‹
 
 		GSVStartPos = 0;
 		SatNumGPS = 0;
 
-	//	printf("\n\r ------- GPS --------------------------------------");
-		NMEA_Parser_GSV_GPS();	// парсим первую строку, смотрим общее количество GSV-GPS строк
-		for (scan = 0; scan < GSVNumStringGPS-1; scan ++ )
-			{
-				NMEA_Parser_GSV_GPS();	// повторяем парсинг
-			}
+		//	printf("\n\r ------- GPS --------------------------------------");
+		NMEA_Parser_GSV_GPS(); // РїР°СЂСЃРёРј РїРµСЂРІСѓСЋ СЃС‚СЂРѕРєСѓ, СЃРјРѕС‚СЂРёРј РѕР±С‰РµРµ РєРѕР»РёС‡РµСЃС‚РІРѕ GSV-GPS СЃС‚СЂРѕРє
+		for (scan = 0; scan < GSVNumStringGPS - 1; scan++)
+		{
+			NMEA_Parser_GSV_GPS(); // РїРѕРІС‚РѕСЂСЏРµРј РїР°СЂСЃРёРЅРі
+		}
 
 		GSVStartPos = 0;
 		SatNumGLO = 0;
 
-	//	printf("\n\r\n\r ------- Glonass ----------------------------------");
-		NMEA_Parser_GSV_GLO ();	// парсим первую строку, смотрим общее количество GSV-GLONASS строк
-		for (scan = 0; scan < GSVNumStringGLO-1; scan ++ )
-			{
-				NMEA_Parser_GSV_GLO();	// повторяем парсинг
-			}
-
-	//  текущие координаты и высота из строки в u32
-		if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
+		//	printf("\n\r\n\r ------- Glonass ----------------------------------");
+		NMEA_Parser_GSV_GLO(); // РїР°СЂСЃРёРј РїРµСЂРІСѓСЋ СЃС‚СЂРѕРєСѓ, СЃРјРѕС‚СЂРёРј РѕР±С‰РµРµ РєРѕР»РёС‡РµСЃС‚РІРѕ GSV-GLONASS СЃС‚СЂРѕРє
+		for (scan = 0; scan < GSVNumStringGLO - 1; scan++)
 		{
-			GPSLongitude = (GPSFixData.Longitude[0]-0x30)*100000000 + (GPSFixData.Longitude[1]-0x30)*10000000 + (GPSFixData.Longitude[2]-0x30)*1000000 +
-					(GPSFixData.Longitude[3]-0x30)*100000 + (GPSFixData.Longitude[4]-0x30)*10000 + (GPSFixData.Longitude[6]-0x30)*1000 +
-					(GPSFixData.Longitude[7]-0x30)*100 + (GPSFixData.Longitude[8]-0x30)*10  + (GPSFixData.Longitude[9]-0x30)*1 ;
+			NMEA_Parser_GSV_GLO(); // РїРѕРІС‚РѕСЂСЏРµРј РїР°СЂСЃРёРЅРі
+		}
 
-			GPSLatitude = (GPSFixData.Latitude[0]-0x30)*10000000 + (GPSFixData.Latitude[1]-0x30)*1000000 + (GPSFixData.Latitude[2]-0x30)*100000 +
-					(GPSFixData.Latitude[3]-0x30)*10000 + (GPSFixData.Latitude[5]-0x30)*1000 + (GPSFixData.Latitude[6]-0x30)*100 +
-					(GPSFixData.Latitude[7]-0x30)*10 + (GPSFixData.Latitude[8]-0x30)*1 ;
+		//  С‚РµРєСѓС‰РёРµ РєРѕРѕСЂРґРёРЅР°С‚С‹ Рё РІС‹СЃРѕС‚Р° РёР· СЃС‚СЂРѕРєРё РІ u32
+		if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
+		{
+			GPSLongitude = (GPSFixData.Longitude[0] - 0x30) * 100000000 + (GPSFixData.Longitude[1] - 0x30) * 10000000 + (GPSFixData.Longitude[2] - 0x30) * 1000000 +
+						   (GPSFixData.Longitude[3] - 0x30) * 100000 + (GPSFixData.Longitude[4] - 0x30) * 10000 + (GPSFixData.Longitude[6] - 0x30) * 1000 +
+						   (GPSFixData.Longitude[7] - 0x30) * 100 + (GPSFixData.Longitude[8] - 0x30) * 10 + (GPSFixData.Longitude[9] - 0x30) * 1;
 
-			if (GPSFixData.NS == 'N')			GPS_N_S = 1 ; 	// признак северная-южная широта
-				else							GPS_N_S = 0 ;
+			GPSLatitude = (GPSFixData.Latitude[0] - 0x30) * 10000000 + (GPSFixData.Latitude[1] - 0x30) * 1000000 + (GPSFixData.Latitude[2] - 0x30) * 100000 +
+						  (GPSFixData.Latitude[3] - 0x30) * 10000 + (GPSFixData.Latitude[5] - 0x30) * 1000 + (GPSFixData.Latitude[6] - 0x30) * 100 +
+						  (GPSFixData.Latitude[7] - 0x30) * 10 + (GPSFixData.Latitude[8] - 0x30) * 1;
 
-			if (GPSFixData.EW == 'E')			GPS_E_W = 0 ; 	// западная-восточная долгота
-				else							GPS_E_W = 1 ;
+			if (GPSFixData.NS == 'N')
+				GPS_N_S = 1; // РїСЂРёР·РЅР°Рє СЃРµРІРµСЂРЅР°СЏ-СЋР¶РЅР°СЏ С€РёСЂРѕС‚Р°
+			else
+				GPS_N_S = 0;
 
-			GPSAltitude = (GPSFixData.Altitude[0]-0x30)*1000 + (GPSFixData.Altitude[1]-0x30)*100 + (GPSFixData.Altitude[2]-0x30)*10 +
-					(GPSFixData.Altitude[4]-0x30)*1;// + (GPSFixData.Altitude[4]-0x30)*10 + (GPSFixData.Altitude[6]-0x30)*1 ;
-			}
+			if (GPSFixData.EW == 'E')
+				GPS_E_W = 0; // Р·Р°РїР°РґРЅР°СЏ-РІРѕСЃС‚РѕС‡РЅР°СЏ РґРѕР»РіРѕС‚Р°
+			else
+				GPS_E_W = 1;
 
-	#ifdef DebugGpsToUart1
+			GPSAltitude = (GPSFixData.Altitude[0] - 0x30) * 1000 + (GPSFixData.Altitude[1] - 0x30) * 100 + (GPSFixData.Altitude[2] - 0x30) * 10 +
+						  (GPSFixData.Altitude[4] - 0x30) * 1; // + (GPSFixData.Altitude[4]-0x30)*10 + (GPSFixData.Altitude[6]-0x30)*1 ;
+		}
+
+#ifdef DebugGpsToUart1
 		printf("\n\r ------- BUFFER ----------------------------------\n\r");
-		for (i=0; i < GPSBUFLENGTH; i++)
-			{
-			if (GPSBuf[i] == '\0') break;
+		for (i = 0; i < GPSBUFLENGTH; i++)
+		{
+			if (GPSBuf[i] == '\0')
+				break;
 			USART_SendByte(USART1, GPSBuf[i]);
-			}
+		}
 
 		printf("\n\r ------- DATA DECODED ----------------------------------\n\r");
-		printf ("\n\r Year: \t\t");
-		for (i=0; i<4; i++)
-			{
+		printf("\n\r Year: \t\t");
+		for (i = 0; i < 4; i++)
+		{
 			USART_SendByte(USART1, GPSFixData.Year[i]);
-			}
-		printf ("\n\r Month: \t\t");
-		for (i=0; i<2; i++)
-			{
+		}
+		printf("\n\r Month: \t\t");
+		for (i = 0; i < 2; i++)
+		{
 			USART_SendByte(USART1, GPSFixData.Month[i]);
-			}
-		printf ("\n\r Day: \t\t");
-		for (i=0; i<2; i++)
-			{
+		}
+		printf("\n\r Day: \t\t");
+		for (i = 0; i < 2; i++)
+		{
 			USART_SendByte(USART1, GPSFixData.Day[i]);
-			}
-		printf ("\n\r UTC Time: \t%c%c:%c%c:%c%c.%c%c",GPSFixData.Time[0],GPSFixData.Time[1],GPSFixData.Time[2],GPSFixData.Time[3],GPSFixData.Time[4],
-				GPSFixData.Time[5], GPSFixData.Time[7], GPSFixData.Time[8]);
-		//for (i=0; i<9; i++)
+		}
+		printf("\n\r UTC Time: \t%c%c:%c%c:%c%c.%c%c", GPSFixData.Time[0], GPSFixData.Time[1], GPSFixData.Time[2], GPSFixData.Time[3], GPSFixData.Time[4],
+			   GPSFixData.Time[5], GPSFixData.Time[7], GPSFixData.Time[8]);
+		// for (i=0; i<9; i++)
 		//	{
 		//	USART_SendByte(USART1, GPSFixData.Time[i]);
 		//	}
-		printf ("\n\r LocalTimeHr:\t");
-		for (i=0; i<3; i++)
-			{
+		printf("\n\r LocalTimeHr:\t");
+		for (i = 0; i < 3; i++)
+		{
 			USART_SendByte(USART1, GPSFixData.LocalTimeHr[i]);
-			}
-		printf ("\n\r LocalTimeMn:\t");
-		for (i=0; i<2; i++)
-			{
+		}
+		printf("\n\r LocalTimeMn:\t");
+		for (i = 0; i < 2; i++)
+		{
 			USART_SendByte(USART1, GPSFixData.LocalTimeMn[i]);
-			}
-		printf ("\n\r Altitude: \t\t");
-		for (i=0; i<5; i++)
-			{
+		}
+		printf("\n\r Altitude: \t\t");
+		for (i = 0; i < 5; i++)
+		{
 			USART_SendByte(USART1, GPSFixData.Altitude[i]);
-			}
-		printf (" m\n\r Latitude: \t\t");
-		for (i=0; i<9; i++)
-			{
+		}
+		printf(" m\n\r Latitude: \t\t");
+		for (i = 0; i < 9; i++)
+		{
 			USART_SendByte(USART1, GPSFixData.Latitude[i]);
-			}
-		printf (" %c\n\r Longitude: \t", GPSFixData.NS );
-			for (i=0; i<10; i++)
-			{
+		}
+		printf(" %c\n\r Longitude: \t", GPSFixData.NS);
+		for (i = 0; i < 10; i++)
+		{
 			USART_SendByte(USART1, GPSFixData.Longitude[i]);
-			}
-		printf (" %c\n\r ReceiverMode: \t", GPSFixData.EW);
-		for (i=0; i<1; i++)
-			{
+		}
+		printf(" %c\n\r ReceiverMode: \t", GPSFixData.EW);
+		for (i = 0; i < 1; i++)
+		{
 			USART_SendByte(USART1, GPSFixData.ReceiverMode);
-			}
+		}
 		if (GPSFixData.ReceiverMode == '0')
-			printf ("\t (NO solution)");
+			printf("\t (NO solution)");
 		if (GPSFixData.ReceiverMode == '1')
-			printf ("\t (StandAlone)");
+			printf("\t (StandAlone)");
 		if (GPSFixData.ReceiverMode == '2')
-			printf ("\t (DGPS)");
-	#endif
-	//printf ("\n\r Tracked SATs: \t");
-		j=0;
-		for (i=0; i<2; i++)
-			{
-			if (GPSFixData.SatelliteNum[i] == '\0') break;
-			//USART_SendByte(USART1, GPSFixData.SatelliteNum[i]);
-			j++;		// счетчик цифр
-			}
-		if (j == 1) 								// одна цифра
+			printf("\t (DGPS)");
+#endif
+		// printf ("\n\r Tracked SATs: \t");
+		j = 0;
+		for (i = 0; i < 2; i++)
+		{
+			if (GPSFixData.SatelliteNum[i] == '\0')
+				break;
+			// USART_SendByte(USART1, GPSFixData.SatelliteNum[i]);
+			j++; // СЃС‡РµС‚С‡РёРє С†РёС„СЂ
+		}
+		if (j == 1) // РѕРґРЅР° С†РёС„СЂР°
 			SatFix = GPSFixData.SatelliteNum[0] - 0x30;
-		else if (j == 2)							// две цифры
-			SatFix = (GPSFixData.SatelliteNum[0] - 0x30) * 10 + (GPSFixData.SatelliteNum[1] - 0x30);			// из ASCII кода в цифры
+		else if (j == 2)																			 // РґРІРµ С†РёС„СЂС‹
+			SatFix = (GPSFixData.SatelliteNum[0] - 0x30) * 10 + (GPSFixData.SatelliteNum[1] - 0x30); // РёР· ASCII РєРѕРґР° РІ С†РёС„СЂС‹
 		else
 			SatFix = 0;
 
-	#ifdef DebugGpsToUart1
-		printf ("\n\r GGA Fix SATs: \t%d ", SatFix);
-		printf ("\n\r GSV GPS SATs: \t%d", SatNumGPS);
-		printf ("\n\r GSV GLO SATs: \t%d", SatNumGLO);
-		printf ("\n\r GSA SatFixGPS: \t%d", SatFixGPS);
-		printf ("\n\r GSA SatFixGLO: \t%d", SatFixGLO);
-	#endif
-	//	for (i=0; i<SatNum; i++)
-	//	{
-		//	printf ("\n\r %d\tSAT# %c%c\tElev:%c%c°\tAzim:%c%c%c\t SNR:%c%c dB",i+1, GPSFixData.Sats[i][0][0], GPSFixData.Sats[i][0][1], GPSFixData.Sats[i][1][0], GPSFixData.Sats[i][1][1],
+#ifdef DebugGpsToUart1
+		printf("\n\r GGA Fix SATs: \t%d ", SatFix);
+		printf("\n\r GSV GPS SATs: \t%d", SatNumGPS);
+		printf("\n\r GSV GLO SATs: \t%d", SatNumGLO);
+		printf("\n\r GSA SatFixGPS: \t%d", SatFixGPS);
+		printf("\n\r GSA SatFixGLO: \t%d", SatFixGLO);
+#endif
+		//	for (i=0; i<SatNum; i++)
+		//	{
+		//	printf ("\n\r %d\tSAT# %c%c\tElev:%c%cВ°\tAzim:%c%c%c\t SNR:%c%c dB",i+1, GPSFixData.Sats[i][0][0], GPSFixData.Sats[i][0][1], GPSFixData.Sats[i][1][0], GPSFixData.Sats[i][1][1],
 		//							GPSFixData.Sats[i][2][0], GPSFixData.Sats[i][2][1], GPSFixData.Sats[i][2][2], GPSFixData.Sats[i][3][0], GPSFixData.Sats[i][3][1]   );
-	//	}
+		//	}
 
-		if ( (Fix == 2 || Fix == 3) ) 	// если есть 2D или 3D решение
+		if ((Fix == 2 || Fix == 3)) // РµСЃР»Рё РµСЃС‚СЊ 2D РёР»Рё 3D СЂРµС€РµРЅРёРµ
 		{
-			if (triggerTTFF == 0)		// однократное измерение TTFF
+			if (triggerTTFF == 0) // РѕРґРЅРѕРєСЂР°С‚РЅРѕРµ РёР·РјРµСЂРµРЅРёРµ TTFF
 			{
 				triggerTTFF = 1;
 				TTFF = countPacket;
 			}
 		}
 
-		for (i=0; i<GPSBUFLENGTH; i++) // очистка буфера
-			{
+		for (i = 0; i < GPSBUFLENGTH; i++) // РѕС‡РёСЃС‚РєР° Р±СѓС„РµСЂР°
+		{
 			GPSBuf[i] = '\0';
-			}
+		}
 	}
-
 }
 
 //  ------------------------ MNEA PARCER ---- GPS GSA ------------------------------------
-u8	NMEA_Parser_GSA_GPS	(void) // Парсер DOP GPS
+u8 NMEA_Parser_GSA_GPS(void) // РџР°СЂСЃРµСЂ DOP GPS
 {
-  u8 CommaPos = 0;
-  u8 n = 0;
-  u16 i, StartPos = 0, StartDOP=0;    // Начало строки
+	u8 CommaPos = 0;
+	u8 n = 0;
+	u16 i, StartPos = 0, StartDOP = 0; // РќР°С‡Р°Р»Рѕ СЃС‚СЂРѕРєРё
 
-  while (!( (GPSBuf[StartPos] == '$')
-		&&(GPSBuf[StartPos+1] == 'G')
-		&&(GPSBuf[StartPos+2] == 'P')
-		&&(GPSBuf[StartPos+3] == 'G')
-		&&(GPSBuf[StartPos+4] == 'S')
-		&&(GPSBuf[StartPos+5] == 'A'))
-		&& StartPos < (GPSBUFLENGTH - sizeof("$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.1,2.2,3.3*cs")+1))
-	StartPos++;
-//printf ("\n\r GSA Parser: "); // todo
-//printf ("\n\r StartPos = %d", StartPos); // todo
-  // начало пакета слишком сильно смещено, отбрасываем пакет
-  if (StartPos > GPSBUFLENGTH - sizeof("$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.1,2.2,3.3*cs")-1) // начало слишком далеко, посылка уже не войдет до конца
-	  {
-//printf ("\n\rGSA offset ERROR!");
-	  //return 0;
-	  }
+	while (!((GPSBuf[StartPos] == '$') && (GPSBuf[StartPos + 1] == 'G') && (GPSBuf[StartPos + 2] == 'P') && (GPSBuf[StartPos + 3] == 'G') && (GPSBuf[StartPos + 4] == 'S') && (GPSBuf[StartPos + 5] == 'A')) && StartPos < (GPSBUFLENGTH - sizeof("$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.1,2.2,3.3*cs") + 1))
+		StartPos++;
+	// printf ("\n\r GSA Parser: "); // todo
+	// printf ("\n\r StartPos = %d", StartPos); // todo
+	//  РЅР°С‡Р°Р»Рѕ РїР°РєРµС‚Р° СЃР»РёС€РєРѕРј СЃРёР»СЊРЅРѕ СЃРјРµС‰РµРЅРѕ, РѕС‚Р±СЂР°СЃС‹РІР°РµРј РїР°РєРµС‚
+	if (StartPos > GPSBUFLENGTH - sizeof("$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.1,2.2,3.3*cs") - 1) // РЅР°С‡Р°Р»Рѕ СЃР»РёС€РєРѕРј РґР°Р»РµРєРѕ, РїРѕСЃС‹Р»РєР° СѓР¶Рµ РЅРµ РІРѕР№РґРµС‚ РґРѕ РєРѕРЅС†Р°
+	{
+		// printf ("\n\rGSA offset ERROR!");
+		// return 0;
+	}
 
-  if (ControlCheckSum(StartPos) == 0) // проверка контрольной суммы CRC
- 	  {
-//printf ("\n\r GSA CRC ERROR!"); // todo
- 	  //return 0; // Проверка контрольной суммы todo
- 	  }
-  else
-   	  {
-//printf ("\n\r GSA CRC OK"); // todo
- 	  }
+	if (ControlCheckSum(StartPos) == 0) // РїСЂРѕРІРµСЂРєР° РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹ CRC
+	{
+		// printf ("\n\r GSA CRC ERROR!"); // todo
+		// return 0; // РџСЂРѕРІРµСЂРєР° РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹ todo
+	}
+	else
+	{
+		// printf ("\n\r GSA CRC OK"); // todo
+	}
 
-  if (GPSBuf[StartPos+7] == 'A')
-	  AutoSel_2D3D = 1;	// автоматический режим выбора 2D/3D
-  else  if (GPSBuf[StartPos+7] == 'M')
-	  AutoSel_2D3D = 0;	// ручной режим выбора 2D/3D
-  else
-	  AutoSel_2D3D = 2; // не действительное значение
+	if (GPSBuf[StartPos + 7] == 'A')
+		AutoSel_2D3D = 1; // Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ СЂРµР¶РёРј РІС‹Р±РѕСЂР° 2D/3D
+	else if (GPSBuf[StartPos + 7] == 'M')
+		AutoSel_2D3D = 0; // СЂСѓС‡РЅРѕР№ СЂРµР¶РёРј РІС‹Р±РѕСЂР° 2D/3D
+	else
+		AutoSel_2D3D = 2; // РЅРµ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 
-  if (GPSBuf[StartPos+9] == '1')
-	  Fix = 1;			// нет решения
-  else if (GPSBuf[StartPos+9] == '2')
-	  Fix = 2;			// 2D - не определена высота
-  else if (GPSBuf[StartPos+9] == '3')
-	  Fix = 3;			// 3D - высота и координаты определены
-  else
-	  Fix = 0;			// не действительное значение
+	if (GPSBuf[StartPos + 9] == '1')
+		Fix = 1; // РЅРµС‚ СЂРµС€РµРЅРёСЏ
+	else if (GPSBuf[StartPos + 9] == '2')
+		Fix = 2; // 2D - РЅРµ РѕРїСЂРµРґРµР»РµРЅР° РІС‹СЃРѕС‚Р°
+	else if (GPSBuf[StartPos + 9] == '3')
+		Fix = 3; // 3D - РІС‹СЃРѕС‚Р° Рё РєРѕРѕСЂРґРёРЅР°С‚С‹ РѕРїСЂРµРґРµР»РµРЅС‹
+	else
+		Fix = 0; // РЅРµ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
 
-  for (i=0; i<12; i++)  // очистка массива номеров используемых спутников
-  {
-	  SatUsedGPS [i] = 0;
-  }
+	for (i = 0; i < 12; i++) // РѕС‡РёСЃС‚РєР° РјР°СЃСЃРёРІР° РЅРѕРјРµСЂРѕРІ РёСЃРїРѕР»СЊР·СѓРµРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ
+	{
+		SatUsedGPS[i] = 0;
+	}
 
-//printf ("\n\r");
-//for (i = StartPos+10; i < GPSBUFLENGTH ; i++)   // Ждем конца буфера
-//{
-//	if (GPSBuf[i] == '$') break;
-//	USART_SendByte(USART1, GPSBuf[i]);
-//}
+	// printf ("\n\r");
+	// for (i = StartPos+10; i < GPSBUFLENGTH ; i++)   // Р–РґРµРј РєРѕРЅС†Р° Р±СѓС„РµСЂР°
+	//{
+	//	if (GPSBuf[i] == '$') break;
+	//	USART_SendByte(USART1, GPSBuf[i]);
+	// }
 
-  for (i = StartPos+10; i < GPSBUFLENGTH ; i++)   // Ждем или конца буфера или 12-й запятой
-    {
-	  if ( (GPSBuf[i] == ',') && (GPSBuf[i+1] == '0') && (GPSBuf[i+2] == ',')  ) 	// поле без значений
-      {
-    	i+=1 ; 			// пропускаем ноль между запятыми
-        CommaPos ++; 	// Наращиваем счетчик запятых
-//printf ("\n\r ,0, i: %d C:%d ",i, CommaPos); // todo
-      }
-      else
-      {
-    	SatUsedGPS [n] = (GPSBuf[i+1]-0x30)*10 + (GPSBuf[i+2]-0x30); 	// номер спутника
+	for (i = StartPos + 10; i < GPSBUFLENGTH; i++) // Р–РґРµРј РёР»Рё РєРѕРЅС†Р° Р±СѓС„РµСЂР° РёР»Рё 12-Р№ Р·Р°РїСЏС‚РѕР№
+	{
+		if ((GPSBuf[i] == ',') && (GPSBuf[i + 1] == '0') && (GPSBuf[i + 2] == ',')) // РїРѕР»Рµ Р±РµР· Р·РЅР°С‡РµРЅРёР№
+		{
+			i += 1;		// РїСЂРѕРїСѓСЃРєР°РµРј РЅРѕР»СЊ РјРµР¶РґСѓ Р·Р°РїСЏС‚С‹РјРё
+			CommaPos++; // РќР°СЂР°С‰РёРІР°РµРј СЃС‡РµС‚С‡РёРє Р·Р°РїСЏС‚С‹С…
+						// printf ("\n\r ,0, i: %d C:%d ",i, CommaPos); // todo
+		}
+		else
+		{
+			SatUsedGPS[n] = (GPSBuf[i + 1] - 0x30) * 10 + (GPSBuf[i + 2] - 0x30); // РЅРѕРјРµСЂ СЃРїСѓС‚РЅРёРєР°
 
-    	CommaPos ++; 	// Наращиваем счетчик запятых
-    	n++ ;			// счетчик спутников
-    	i+=2 ; 			// переход на следующее значение
-//printf ("\n\r i: %d C:%d ",i, CommaPos); // todo
-      }
-	  SatFixGPS = n; 	// количество спутников GPS, найденных при парсинге
+			CommaPos++; // РќР°СЂР°С‰РёРІР°РµРј СЃС‡РµС‚С‡РёРє Р·Р°РїСЏС‚С‹С…
+			n++;		// СЃС‡РµС‚С‡РёРє СЃРїСѓС‚РЅРёРєРѕРІ
+			i += 2;		// РїРµСЂРµС…РѕРґ РЅР° СЃР»РµРґСѓСЋС‰РµРµ Р·РЅР°С‡РµРЅРёРµ
+						// printf ("\n\r i: %d C:%d ",i, CommaPos); // todo
+		}
+		SatFixGPS = n; // РєРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ GPS, РЅР°Р№РґРµРЅРЅС‹С… РїСЂРё РїР°СЂСЃРёРЅРіРµ
 
-      if (CommaPos >= 12) // достигли 12-й запятой
-      {
-//printf ("\n\r break (C>=12)");
-      	break;
-      }
-    }
-  StartDOP = i+1; // положение запятой, после которой начинаются DOP параметры
+		if (CommaPos >= 12) // РґРѕСЃС‚РёРіР»Рё 12-Р№ Р·Р°РїСЏС‚РѕР№
+		{
+			// printf ("\n\r break (C>=12)");
+			break;
+		}
+	}
+	StartDOP = i + 1; // РїРѕР»РѕР¶РµРЅРёРµ Р·Р°РїСЏС‚РѕР№, РїРѕСЃР»Рµ РєРѕС‚РѕСЂРѕР№ РЅР°С‡РёРЅР°СЋС‚СЃСЏ DOP РїР°СЂР°РјРµС‚СЂС‹
 
-//printf ("\n\r Used SATs: ");
-//for (i=0; i<12; i++)  // очистка массива номеров используемых спутников
-//{
-//  printf ("%d ", SatUsed [i] ); 	// todo
-//}
+	// printf ("\n\r Used SATs: ");
+	// for (i=0; i<12; i++)  // РѕС‡РёСЃС‚РєР° РјР°СЃСЃРёРІР° РЅРѕРјРµСЂРѕРІ РёСЃРїРѕР»СЊР·СѓРµРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ
+	//{
+	//   printf ("%d ", SatUsed [i] ); 	// todo
+	// }
 
-//printf ("\n\rStartDOP:%d ", StartDOP); 	// todo
-//printf ("\n\r");
-//for (i = StartDOP; i < GPSBUFLENGTH ; i++)   // Вывод буфера в терминал
-//{
-//	if (GPSBuf[i] == '$') break;
-//	USART_SendByte(USART1, GPSBuf[i]);
-//}
+	// printf ("\n\rStartDOP:%d ", StartDOP); 	// todo
+	// printf ("\n\r");
+	// for (i = StartDOP; i < GPSBUFLENGTH ; i++)   // Р’С‹РІРѕРґ Р±СѓС„РµСЂР° РІ С‚РµСЂРјРёРЅР°Р»
+	//{
+	//	if (GPSBuf[i] == '$') break;
+	//	USART_SendByte(USART1, GPSBuf[i]);
+	// }
 
-  	i = 0; // сброс счетчика
+	i = 0; // СЃР±СЂРѕСЃ СЃС‡РµС‚С‡РёРєР°
 
-	if ( (GPSBuf[StartDOP+i] == ',') && (GPSBuf[StartDOP+i+1] == '0') && (GPSBuf[StartDOP+i+2] == ',')  ) 	// поле без значений
+	if ((GPSBuf[StartDOP + i] == ',') && (GPSBuf[StartDOP + i + 1] == '0') && (GPSBuf[StartDOP + i + 2] == ',')) // РїРѕР»Рµ Р±РµР· Р·РЅР°С‡РµРЅРёР№
 	{
 		PDOP = 0;
 		i += 2;
 	}
 	else
 	{
-		PDOP = (GPSBuf[StartDOP+i+1]-0x30)*100 + (GPSBuf[StartDOP+i+3]-0x30)*10 + (GPSBuf[StartDOP+i+4]-0x30)*1 ; 	// PDOP*100
+		PDOP = (GPSBuf[StartDOP + i + 1] - 0x30) * 100 + (GPSBuf[StartDOP + i + 3] - 0x30) * 10 + (GPSBuf[StartDOP + i + 4] - 0x30) * 1; // PDOP*100
 		i += 5;
 	}
-//printf ("\n\rPDOP:%d ", PDOP); // todo
+	// printf ("\n\rPDOP:%d ", PDOP); // todo
 
-	if ( (GPSBuf[StartDOP+i] == ',') && (GPSBuf[StartDOP+i+1] == '0') && (GPSBuf[StartDOP+i+2] == ',')  ) 	// поле без значений
+	if ((GPSBuf[StartDOP + i] == ',') && (GPSBuf[StartDOP + i + 1] == '0') && (GPSBuf[StartDOP + i + 2] == ',')) // РїРѕР»Рµ Р±РµР· Р·РЅР°С‡РµРЅРёР№
 	{
 		HDOP = 0;
 		i += 2;
 	}
 	else
 	{
-		HDOP = (GPSBuf[StartDOP+i+1]-0x30)*100 + (GPSBuf[StartDOP+i+3]-0x30)*10 + (GPSBuf[StartDOP+i+4]-0x30)*1; 	// HDOP*100
+		HDOP = (GPSBuf[StartDOP + i + 1] - 0x30) * 100 + (GPSBuf[StartDOP + i + 3] - 0x30) * 10 + (GPSBuf[StartDOP + i + 4] - 0x30) * 1; // HDOP*100
 		i += 5;
 	}
-//printf ("\n\rHDOP:%d ", HDOP); // todo
+	// printf ("\n\rHDOP:%d ", HDOP); // todo
 
-	if ( (GPSBuf[StartDOP+i] == ',') && (GPSBuf[StartDOP+i+1] == '0') && (GPSBuf[StartDOP+i+2] == '*')  ) 	// поле без значений
+	if ((GPSBuf[StartDOP + i] == ',') && (GPSBuf[StartDOP + i + 1] == '0') && (GPSBuf[StartDOP + i + 2] == '*')) // РїРѕР»Рµ Р±РµР· Р·РЅР°С‡РµРЅРёР№
 	{
 		VDOP = 0;
-		//i += 2;
+		// i += 2;
 	}
 	else
 	{
-		VDOP = (GPSBuf[StartDOP+i+1]-0x30)*100 + (GPSBuf[StartDOP+i+3]-0x30)*10 + (GPSBuf[StartDOP+i+4]-0x30)*1; 	// VDOP*100
-		//i += 4;
+		VDOP = (GPSBuf[StartDOP + i + 1] - 0x30) * 100 + (GPSBuf[StartDOP + i + 3] - 0x30) * 10 + (GPSBuf[StartDOP + i + 4] - 0x30) * 1; // VDOP*100
+																																		 // i += 4;
 	}
-//printf ("\n\rVDOP:%d ", VDOP); // todo
+	// printf ("\n\rVDOP:%d ", VDOP); // todo
 
-  //HDOP = (GPSBuf[StartDOP+4]-0x30)*10 + (GPSBuf[StartDOP+4+2]-0x30) ; 	// HDOP*10
-  //VDOP = (GPSBuf[StartDOP+8]-0x30)*10 + (GPSBuf[StartDOP+8+2]-0x30) ; 	// VDOP*10
+	// HDOP = (GPSBuf[StartDOP+4]-0x30)*10 + (GPSBuf[StartDOP+4+2]-0x30) ; 	// HDOP*10
+	// VDOP = (GPSBuf[StartDOP+8]-0x30)*10 + (GPSBuf[StartDOP+8+2]-0x30) ; 	// VDOP*10
 
-  return 1;
-
+	return 1;
 }
 
 //  ------------------------ GLONASS GSA -----------------------------
-u8	NMEA_Parser_GSA_GLO	(void) // Парсер DOP GPS
+u8 NMEA_Parser_GSA_GLO(void) // РџР°СЂСЃРµСЂ DOP GPS
 {
-  u8 CommaPos = 0;
-  u8 n = 0;
-  u16 i, StartPos = 0, StartDOP=0;    // Начало строки
+	u8 CommaPos = 0;
+	u8 n = 0;
+	u16 i, StartPos = 0, StartDOP = 0; // РќР°С‡Р°Р»Рѕ СЃС‚СЂРѕРєРё
 
-  while (!( (GPSBuf[StartPos] == '$')
-		&&(GPSBuf[StartPos+1] == 'G')
-		&&(GPSBuf[StartPos+2] == 'L')
-		&&(GPSBuf[StartPos+3] == 'G')
-		&&(GPSBuf[StartPos+4] == 'S')
-		&&(GPSBuf[StartPos+5] == 'A'))
-		&& StartPos < (GPSBUFLENGTH - sizeof("$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.1,2.2,3.3*cs")+1))
-	StartPos++;
-//printf ("\n\r GSA Parser: "); // todo
-//printf ("\n\r StartPos = %d", StartPos); // todo
-  // начало пакета слишком сильно смещено, отбрасываем пакет
-  if (StartPos > GPSBUFLENGTH - sizeof("$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.1,2.2,3.3*cs")-1) // начало слишком далеко, посылка уже не войдет до конца
-	  {
-//printf ("\n\rGSA offset ERROR!");
-	  //return 0;
-	  }
-
-  if (ControlCheckSum(StartPos) == 0) // проверка контрольной суммы CRC
- 	  {
-//printf ("\n\r GSA CRC ERROR!"); // todo
- 	  //return 0; // Проверка контрольной суммы todo
- 	  }
-  else
-   	  {
-//printf ("\n\r GSA CRC OK"); // todo
- 	  }
-
- /* if (GPSBuf[StartPos+7] == 'A')
-	  AutoSel_2D3D = 1;	// автоматический режим выбора 2D/3D
-  else  if (GPSBuf[StartPos+7] == 'M')
-	  AutoSel_2D3D = 0;	// ручной режим выбора 2D/3D
-  else
-	  AutoSel_2D3D = 2; // не действительное значение
-
-  if (GPSBuf[StartPos+9] == '1')
-	  Fix = 1;			// нет решения
-  else if (GPSBuf[StartPos+9] == '2')
-	  Fix = 2;			// 2D - не определена высота
-  else if (GPSBuf[StartPos+9] == '3')
-	  Fix = 3;			// 3D - высота и координаты определены
-  else
-	  Fix = 0;			// не действительное значение
-*/
-
-  for (i=0; i<12; i++)  // очистка массива номеров используемых спутников
-  {
-	  SatUsedGLO [i] = 0;
-  }
-
-//printf ("\n\r");
-//for (i = StartPos+10; i < GPSBUFLENGTH ; i++)   // Ждем конца буфера
-//{
-//	if (GPSBuf[i] == '$') break;
-//	USART_SendByte(USART1, GPSBuf[i]);
-//}
-
-  for (i = StartPos+10; i < GPSBUFLENGTH ; i++)   // Ждем или конца буфера или 12-й запятой
-    {
-	  if ( (GPSBuf[i] == ',') && (GPSBuf[i+1] == '0') && (GPSBuf[i+2] == ',')  ) 	// поле без значений
-      {
-    	i+=1 ; 			// пропускаем ноль между запятыми
-        CommaPos ++; 	// Наращиваем счетчик запятых
-//printf ("\n\r ,0, i: %d C:%d ",i, CommaPos); // todo
-      }
-      else
-      {
-    	SatUsedGLO [n] = (GPSBuf[i+1]-0x30)*10 + (GPSBuf[i+2]-0x30); 	// номер спутника
-
-    	CommaPos ++; 	// Наращиваем счетчик запятых
-    	n++ ;			// счетчик спутников
-    	i+=2 ; 			// переход на следующее значение
-//printf ("\n\r i: %d C:%d ",i, CommaPos); // todo
-      }
-	  SatFixGLO = n; 	// количество спутников GLONASS, найденных при парсинге
-
-      if (CommaPos >= 12) // достигли 12-й запятой
-      {
-//printf ("\n\r break (C>=12)");
-      	break;
-      }
-    }
-  StartDOP = i+1; // положение запятой, после которой начинаются DOP параметры
-
-//printf ("\n\r Used SATs: ");
-//for (i=0; i<12; i++)  // очистка массива номеров используемых спутников
-//{
-//  printf ("%d ", SatUsed [i] ); 	// todo
-//}
-
-//printf ("\n\rStartDOP:%d ", StartDOP); 	// todo
-//printf ("\n\r");
-//for (i = StartDOP; i < GPSBUFLENGTH ; i++)   // Вывод буфера в терминал
-//{
-//	if (GPSBuf[i] == '$') break;
-//	USART_SendByte(USART1, GPSBuf[i]);
-//}
-
-  	i = 0; // сброс счетчика
-
-	if ( (GPSBuf[StartDOP+i] == ',') && (GPSBuf[StartDOP+i+1] == '0') && (GPSBuf[StartDOP+i+2] == ',')  ) 	// поле без значений
+	while (!((GPSBuf[StartPos] == '$') && (GPSBuf[StartPos + 1] == 'G') && (GPSBuf[StartPos + 2] == 'L') && (GPSBuf[StartPos + 3] == 'G') && (GPSBuf[StartPos + 4] == 'S') && (GPSBuf[StartPos + 5] == 'A')) && StartPos < (GPSBUFLENGTH - sizeof("$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.1,2.2,3.3*cs") + 1))
+		StartPos++;
+	// printf ("\n\r GSA Parser: "); // todo
+	// printf ("\n\r StartPos = %d", StartPos); // todo
+	//  РЅР°С‡Р°Р»Рѕ РїР°РєРµС‚Р° СЃР»РёС€РєРѕРј СЃРёР»СЊРЅРѕ СЃРјРµС‰РµРЅРѕ, РѕС‚Р±СЂР°СЃС‹РІР°РµРј РїР°РєРµС‚
+	if (StartPos > GPSBUFLENGTH - sizeof("$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.1,2.2,3.3*cs") - 1) // РЅР°С‡Р°Р»Рѕ СЃР»РёС€РєРѕРј РґР°Р»РµРєРѕ, РїРѕСЃС‹Р»РєР° СѓР¶Рµ РЅРµ РІРѕР№РґРµС‚ РґРѕ РєРѕРЅС†Р°
 	{
-		//PDOP = 0;
-		i += 2;
+		// printf ("\n\rGSA offset ERROR!");
+		// return 0;
+	}
+
+	if (ControlCheckSum(StartPos) == 0) // РїСЂРѕРІРµСЂРєР° РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹ CRC
+	{
+		// printf ("\n\r GSA CRC ERROR!"); // todo
+		// return 0; // РџСЂРѕРІРµСЂРєР° РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹ todo
 	}
 	else
 	{
-		//PDOP = (GPSBuf[StartDOP+i+1]-0x30)*100 + (GPSBuf[StartDOP+i+3]-0x30)*10 + (GPSBuf[StartDOP+i+4]-0x30)*1 ; 	// PDOP*100
-		i += 5;
+		// printf ("\n\r GSA CRC OK"); // todo
 	}
-//printf ("\n\rPDOP:%d ", PDOP); // todo
 
-	if ( (GPSBuf[StartDOP+i] == ',') && (GPSBuf[StartDOP+i+1] == '0') && (GPSBuf[StartDOP+i+2] == ',')  ) 	// поле без значений
+	/* if (GPSBuf[StartPos+7] == 'A')
+		 AutoSel_2D3D = 1;	// Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ СЂРµР¶РёРј РІС‹Р±РѕСЂР° 2D/3D
+	 else  if (GPSBuf[StartPos+7] == 'M')
+		 AutoSel_2D3D = 0;	// СЂСѓС‡РЅРѕР№ СЂРµР¶РёРј РІС‹Р±РѕСЂР° 2D/3D
+	 else
+		 AutoSel_2D3D = 2; // РЅРµ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
+
+	 if (GPSBuf[StartPos+9] == '1')
+		 Fix = 1;			// РЅРµС‚ СЂРµС€РµРЅРёСЏ
+	 else if (GPSBuf[StartPos+9] == '2')
+		 Fix = 2;			// 2D - РЅРµ РѕРїСЂРµРґРµР»РµРЅР° РІС‹СЃРѕС‚Р°
+	 else if (GPSBuf[StartPos+9] == '3')
+		 Fix = 3;			// 3D - РІС‹СЃРѕС‚Р° Рё РєРѕРѕСЂРґРёРЅР°С‚С‹ РѕРїСЂРµРґРµР»РµРЅС‹
+	 else
+		 Fix = 0;			// РЅРµ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
+   */
+
+	for (i = 0; i < 12; i++) // РѕС‡РёСЃС‚РєР° РјР°СЃСЃРёРІР° РЅРѕРјРµСЂРѕРІ РёСЃРїРѕР»СЊР·СѓРµРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ
 	{
-		//HDOP = 0;
-		i += 2;
+		SatUsedGLO[i] = 0;
 	}
-	else
+
+	// printf ("\n\r");
+	// for (i = StartPos+10; i < GPSBUFLENGTH ; i++)   // Р–РґРµРј РєРѕРЅС†Р° Р±СѓС„РµСЂР°
+	//{
+	//	if (GPSBuf[i] == '$') break;
+	//	USART_SendByte(USART1, GPSBuf[i]);
+	// }
+
+	for (i = StartPos + 10; i < GPSBUFLENGTH; i++) // Р–РґРµРј РёР»Рё РєРѕРЅС†Р° Р±СѓС„РµСЂР° РёР»Рё 12-Р№ Р·Р°РїСЏС‚РѕР№
 	{
-		//HDOP = (GPSBuf[StartDOP+i+1]-0x30)*100 + (GPSBuf[StartDOP+i+3]-0x30)*10 + (GPSBuf[StartDOP+i+4]-0x30)*1; 	// HDOP*100
-		i += 5;
-	}
-//printf ("\n\rHDOP:%d ", HDOP); // todo
-
-	if ( (GPSBuf[StartDOP+i] == ',') && (GPSBuf[StartDOP+i+1] == '0') && (GPSBuf[StartDOP+i+2] == '*')  ) 	// поле без значений
-	{
-		//VDOP = 0;
-		//i += 2;
-	}
-	else
-	{
-		//VDOP = (GPSBuf[StartDOP+i+1]-0x30)*100 + (GPSBuf[StartDOP+i+3]-0x30)*10 + (GPSBuf[StartDOP+i+4]-0x30)*1; 	// VDOP*100
-		//i += 4;
-	}
-//printf ("\n\rVDOP:%d ", VDOP); // todo
-
-  //HDOP = (GPSBuf[StartDOP+4]-0x30)*10 + (GPSBuf[StartDOP+4+2]-0x30) ; 	// HDOP*10
-  //VDOP = (GPSBuf[StartDOP+8]-0x30)*10 + (GPSBuf[StartDOP+8+2]-0x30) ; 	// VDOP*10
-
-  return 1;
-
-}
-
-u8 	NMEA_Parser_GGA	(void)
-{
-  u8 CommaPos = 0;
-  u8 k = 0;
-  u16 i,StartPos = 0;    // Начало строки
-
-  while (!( (GPSBuf[StartPos] == '$')
-        &&(GPSBuf[StartPos+3] == 'G')
-        &&(GPSBuf[StartPos+4] == 'G')
-        &&(GPSBuf[StartPos+5] == 'A'))
-        && StartPos < 7)
-    StartPos++;
-//printf ("\n\r GGA Parser: "); // todo
-//printf ("\n\r StartPos = %d", StartPos); // todo
-  // начало пакета слишком сильно смещено, отбрасываем пакет
-  if (StartPos>5)
-	  {
-	 // printf ("\n\rStartPos>5\n\r");
-	  return 0;
-	  }
-
-  if (ControlCheckSum(StartPos) == 0)
-	  {
-//printf ("\n\r GGA CRC ERROR!"); // todo
-	  //return 0; // Проверка контрольной суммы todo
-	  }
-  else
-  	  {
-//printf ("\n\r GGA CRC OK"); // todo
-	  }
-
-  memset(&GPSFixData, 0, sizeof(GPSFixData));   // Очищаем структуру
-
-  for (i = StartPos+6; i < GPSBUFLENGTH ; i++)   // Ждем или конца буфера или 10-й запятой
-  {
-    if (GPSBuf[i] == ',')
-    {
-      CommaPos++; // Наращиваем счетчик запятых
-      k=0;
-    }
-    else
-      switch (CommaPos) // Пользуемся тем, что данные разделяются запятыми. Неопределенные данные (две запятые подряд) мы заменили нулем в обработчике прерывания USART1_IRQHandler()
-      {
-        // После первой запятой идет время, но мы возьмем его позже из ZDA сентенции, синхронно с датой
-        case 2: if(k < sizeof(GPSFixData.Latitude)-1) GPSFixData.Latitude[k++]=GPSBuf[i]; break;
-        case 3: if(k < sizeof(GPSFixData.NS)) GPSFixData.NS=GPSBuf[i]; break;
-        case 4: if(k < sizeof(GPSFixData.Longitude)-1) GPSFixData.Longitude[k++]=GPSBuf[i]; break;
-        case 5: if(k < sizeof(GPSFixData.EW)) GPSFixData.EW=GPSBuf[i]; break;
-        case 6: if(k < sizeof(GPSFixData.ReceiverMode))  GPSFixData.ReceiverMode=GPSBuf[i]; break;
-        case 7: if(k < sizeof(GPSFixData.SatelliteNum)-1) GPSFixData.SatelliteNum[k++]=GPSBuf[i]; break;
-        case 9: if(k < sizeof(GPSFixData.Altitude)-1) GPSFixData.Altitude[k++]=GPSBuf[i]; break;
-        case 10: return 1; break;
-        default: break;
-      }
-  }
-  return 1;
-}
-
-u8  NMEA_Parser_ZDA	(void)
-{
-  u8 CommaPos = 0;
-  u8 k;              		// Просто счетчик
-  u16 i,StartPos = 0;    	// Начало строки
-
-  while (!( (GPSBuf[StartPos] == '$')
-        &&(GPSBuf[StartPos+3] == 'Z')
-        &&(GPSBuf[StartPos+4] == 'D')
-        &&(GPSBuf[StartPos+5] == 'A'))
-        && StartPos < (GPSBUFLENGTH - sizeof("$GNZDA,hhmmss.ss,dd,mm,yyyy,+hh,mm*cs")+1))
-    StartPos++;
-//printf ("\n\r ZGA Parser: "); // todo
-//printf ("\n\r StartPos = %d", StartPos); // todo
-  // начало пакета слишком сильно смещено, отбрасываем этот пакет
-  if (StartPos > (GPSBUFLENGTH - sizeof("$GNZDA,hhmmss.ss,dd,mm,yyyy,+hh,mm*cs")-1))
-	  {
-//printf ("\n\r ZDA offset ERROR!"); // todo
-	  return 0;
-	  }
-
-  if (ControlCheckSum(StartPos) == 0) // Проверка контрольной суммы
-  {
-//printf ("\n\r ZDA CRC ERROR!"); // todo
-  return 0; // Проверка контрольной суммы
-  }
-//printf ("\n\r ZDA CRC OK"); // todo
-
-  for (i = StartPos+5; i < GPSBUFLENGTH ; i++)   // Ждем или конца буфера или 7-й запятой
-  {
-    if (GPSBuf[i] == ',')
-    {
-      CommaPos++; // Наращиваем счетчик запятых
-      k=0;
-    }
-    else
-      switch (CommaPos) // Пользуемся тем, что данные разделяются запятыми. Неопределенные данные (две запятые подряд) мы заменили нулем в обработчике прерывания USART1_IRQHandler()
-      {
-        case 1: if(k < sizeof(GPSFixData.Time)-1) GPSFixData.Time[k++]=GPSBuf[i]; break;
-        case 2: if(k < sizeof(GPSFixData.Day)-1) GPSFixData.Day[k++]=GPSBuf[i]; break;
-        case 3: if(k < sizeof(GPSFixData.Month)-1) GPSFixData.Month[k++]=GPSBuf[i]; break;
-        case 4: if(k < sizeof(GPSFixData.Year)-1) GPSFixData.Year[k++]=GPSBuf[i];  break;
-        case 5: if(k < sizeof(GPSFixData.LocalTimeHr)-1) GPSFixData.LocalTimeHr[k++]=GPSBuf[i]; break;
-        case 6: if(k < sizeof(GPSFixData.LocalTimeMn)-1) GPSFixData.LocalTimeMn[k++]=GPSBuf[i]; break;
-        case 7: return 1; break;
-        default: break;
-      }
-  }
-  return 1;
-}
-
-u32 GetGPSTimeSec 	(void) 		// вызывать после парсинга ZDA сентенции
-{
-	u32 THH = 0, TMM = 0, TSS = 0 ;
-	THH = (GPSFixData.Time[0]-0x30)*10 + (GPSFixData.Time[1]-0x30);		// часы из ZDA сентенции
-	TMM = (GPSFixData.Time[2]-0x30)*10 + (GPSFixData.Time[3]-0x30);		// минуты из ZDA сентенции
-	TSS = (GPSFixData.Time[4]-0x30)*10 + (GPSFixData.Time[5]-0x30);		// секунды из ZDA сентенции
-	//TmSmS = (GPSFixData.Time[7]-0x30)*10 + (GPSFixData.Time[8]-0x30);	// дробная часть секунд из ZDA сентенции
-
-	return((THH*3600 + TMM*60 + TSS)); // возвращаем целое число секунд за текущие сутки, без дробной части
-}
-u32 GetGPSTimeMilliSec 	(void) 	// вызывать после парсинга ZDA сентенции
-{
-	u32  TmSmS;
-	TmSmS = (GPSFixData.Time[7]-0x30)*10 + (GPSFixData.Time[8]-0x30);	// дробная часть секунд из ZDA сентенции
-	return( TmSmS ) ;   // возвращаем дробную часть
-}
-
-u8  NMEA_Parser_GSV_GPS	(void)
-{
-  u8 CommaPos = 0;
-  u8 k = 0;              // Просто счетчик
-  u16 i = 0;
-
-  while (!( (GPSBuf[GSVStartPos] == '$')
-		&&(GPSBuf[GSVStartPos+2] == 'P') // только GPS спутники
-        &&(GPSBuf[GSVStartPos+3] == 'G')
-        &&(GPSBuf[GSVStartPos+4] == 'S')
-        &&(GPSBuf[GSVStartPos+5] == 'V'))
-        && GSVStartPos < (GPSBUFLENGTH - sizeof("$GPGSV,n,n,nn,11,22,333,44,11,22,333,44,11,22,333,44,11,22,333,44*cs")+1))
-    GSVStartPos++;  // определяем начало очередной GSV строки в посылке
-
-  // начало пакета слишком сильно смещено, отбрасываем его
-  if (GSVStartPos > (GPSBUFLENGTH - sizeof("$GPGSV,n,n,nn,11,22,333,44,11,22,333,44,11,22,333,44,11,22,333,44*cs")-1))
-	  {
-//printf ("\n\r return 0 offset so big "); // todo
-	  return 0;
-	  }
-	  
-  GSVNumStringGPS = GPSBuf[GSVStartPos+7] - 0x30 ; // количество GSV-GPS строк в посылке
-
-  if (ControlCheckSum(GSVStartPos) == 0)
-	  {
-//printf ("\t\tGSV CRC error! "); // todo
-	 // return 0;  // Проверка контрольной суммы
-	  }
-
-  for (i = GSVStartPos+5; i < GPSBUFLENGTH ; i++)    // Ждем или конца буфера или * в приемном буфере
-  {
-    if (GPSBuf[i] == '*')
-    {
-      GSVStartPos = i;		// сдвинули начало за текущую строку
-      SatNumGPS++;				// Наращиваем номер текущего спутника
-      //printf ("\n\rGPSSatNum(*): \t%d \tstart: %d", SatNum, GSVStartPos); // todo
-      return 1;
-    }
-
-    if (GPSBuf[i] == ',')
-    {
-      if ((CommaPos == 7) || (CommaPos == 11) || (CommaPos == 15) || (CommaPos == 19))
-	  {
-	    SatNumGPS++;  	// Наращиваем номер текущего спутника
-//printf ("\n\rGPSSatNum(,): \t%d \tstart: %d", SatNum, GSVStartPos); // todo
-	  }
-      CommaPos++; k=0;  	// Наращиваем счетчик запятых
-    }
-    else
-      switch (CommaPos) // Пользуемся тем, что данные разделяются запятыми. Неопределенные данные (две запятые подряд) мы заменили нулем в обработчике прерывания USART1_IRQHandler()
-      { // После первых трех запятых идет информация об общем количестве спутников, об общем количестве GSV посылок и о номере этой конкретной GSV посылки. Эта информация нам не нужна
-        case 4: case 8: case 12: case 16:  if(k < sizeof(ONESAT)-1) GPSFixData.Sats[SatNumGPS][0][k++]=GPSBuf[i]; break;  // Номер спутника. case 4: case 8: case 12: case 16: - номера запятых,
-//		после которых идет соответствующая информация. В каждой GSV посылке есть информация о максимум 4-х спутниках, поэтому 20-ю запятую можно не обрабатывать
-        case 5: case 9: case 13: case 17:  if(k < sizeof(ONESAT)-1) GPSFixData.Sats[SatNumGPS][1][k++]=GPSBuf[i]; break;  // Угол места
-        case 6: case 10: case 14: case 18: if(k < sizeof(ONESAT)-1) GPSFixData.Sats[SatNumGPS][2][k++]=GPSBuf[i]; break;  // Азимут
-        case 7: case 11: case 15: case 19: if(k < sizeof(ONESAT)-1) GPSFixData.Sats[SatNumGPS][3][k++]=GPSBuf[i]; break;  // Уровень сигнала, SNR
-        default: break;
-      }
-  }
-  return 1;
-}
-
-u8  NMEA_Parser_GSV_GLO (void)
-{
-  u8 CommaPos = 0;
-  u8 k = 0;              // Просто счетчик
-  u16 i = 0;
-
-  while (!( (GPSBuf[GSVStartPos] == '$')
-		&&(GPSBuf[GSVStartPos+2] == 'L') 	// только GLONASS спутники
-        &&(GPSBuf[GSVStartPos+3] == 'G')
-        &&(GPSBuf[GSVStartPos+4] == 'S')
-        &&(GPSBuf[GSVStartPos+5] == 'V'))
-        && GSVStartPos < (GPSBUFLENGTH - sizeof("$GPGSV,n,n,nn,11,22,333,44,11,22,333,44,11,22,333,44,11,22,333,44*cs")+1))
-    GSVStartPos++;
-
-  // начало пакета слишком сильно смещено, отбрасываем его
-  if (GSVStartPos > (GPSBUFLENGTH - sizeof("$GPGSV,n,n,nn,11,22,333,44,11,22,333,44,11,22,333,44,11,22,333,44*cs")-1))
-	  {
-//printf ("\n\r return 0 offset so big "); // todo
-	  return 0;
-	  }
-
-  GSVNumStringGLO = GPSBuf[GSVStartPos+7] - 0x30 ; // количество GSV-GLONASS строк в посылке
-
-  if (ControlCheckSum(GSVStartPos) == 0)
-	  {
-//printf ("\t\tGSV CRC error! "); // todo
-	 // return 0;  // Проверка контрольной суммы
-	  }
-
-  for (i = GSVStartPos+5; i < GPSBUFLENGTH ; i++)    // Ждем или конца буфера или * в приемном буфере
-  {
-    if (GPSBuf[i] == '*')
-    {
-      GSVStartPos = i;
-      SatNumGLO ++;
-	  //printf ("\n\rGLOSatNum(*): \t%d \tstart: %d ", SatNumGLO, GSVStartPos); // todo
-      return 1;
-    }
-
-    if (GPSBuf[i] == ',')
-    {
-      if ((CommaPos == 7) || (CommaPos == 11) || (CommaPos == 15) || (CommaPos == 19))
-    	  {
-    	  	  SatNumGLO ++;  // Наращиваем номер текущего спутника
-    	  	  //printf ("\n\rGLOSatNum(,): \t%d \tstart: %d ", SatNumGLO, GSVStartPos); // todo
-    	  }
-      CommaPos++; k=0;  // Наращиваем счетчик запятых
-    }
-    else
-      switch (CommaPos) // Пользуемся тем, что данные разделяются запятыми. Неопределенные данные (две запятые подряд) мы заменили нулем в обработчике прерывания USART1_IRQHandler()
-      { // После первых трех запятых идет информация об общем количестве спутников, об общем количестве GSV посылок и о номере этой конкретной GSV посылки. Эта информация нам не нужна
-        case 4: case 8: case 12: case 16:  if(k < sizeof(ONESAT)-1) GPSFixData.SatsGLO[SatNumGLO][0][k++]=GPSBuf[i]; break;  // Номер спутника. case 4: case 8: case 12: case 16: - номера запятых, после которых идет соответствующая информация. В каждой GSV посылке есть информация о максимум 4-х спутниках, поэтому 20-ю запятую можно не обрабатывать
-        case 5: case 9: case 13: case 17:  if(k < sizeof(ONESAT)-1) GPSFixData.SatsGLO[SatNumGLO][1][k++]=GPSBuf[i]; break;  // Угол места
-        case 6: case 10: case 14: case 18: if(k < sizeof(ONESAT)-1) GPSFixData.SatsGLO[SatNumGLO][2][k++]=GPSBuf[i]; break;  // Азимут
-        case 7: case 11: case 15: case 19: if(k < sizeof(ONESAT)-1) GPSFixData.SatsGLO[SatNumGLO][3][k++]=GPSBuf[i]; break;  // Уровень сигнала, SNR
-        default: break;
-      }
-  }
-  return 1;
-}
-
-u8  ControlCheckSum 	(u16 StartIndex)
-{
-  u8  CheckSum = 0, MessageCheckSum = 0;   // Контрольная сумма
-  u16 i = StartIndex+1;                	// Смещаемся на один шаг вправо от символа $
-
-  while (GPSBuf[i]!='*')
-  {
-    CheckSum^=GPSBuf[i];
-    if (++i == GPSBUFLENGTH) return 0; 			// Не найден признак контрольной суммы
-  }
-
-  if (GPSBuf[++i]>0x40) MessageCheckSum=(GPSBuf[i]-0x37)<<4; 	// Условие для корректной обработки десятичных
-  else                  MessageCheckSum=(GPSBuf[i]-0x30)<<4;  	// и шестнадцатиричных чисел, представленных в коде ASCII
-  if (GPSBuf[++i]>0x40) MessageCheckSum+=(GPSBuf[i]-0x37);
-  else                  MessageCheckSum+=(GPSBuf[i]-0x30);
-
-  if (MessageCheckSum != CheckSum) return 0;	// Неправильное значение контрольной суммы
-
-  return 1; 	// Все ОК
-}
-
-//-------------------- измерение, усреднение и проверка периода сигнала 1PPS -------------------
-void Measurement1PPS	(void)
-{
-	if ( flag_1PPS_Update == 1 )	// обновилось значение
-	{
-		flag_1PPS_Update = 0;  // сброс флага для однократного срабатывания усреднения
-
-		if ( (TIM4_fix >= 37000) && (TIM4_fix <= 37400) && (counter_TIM4_fix >= 90) && (counter_TIM4_fix <= 92)  )
-			{ // период 1PPS в пределах нормы
-
-				for (i_avg = AVG_TIM4-1; i_avg > 0; i_avg -- )	// сдвиг данных в массиве вправо
-				{
-					averageTIM4 [i_avg] = averageTIM4 [i_avg-1] ;
-				}
-				averageTIM4 [0] = TIM4_fix; // текущее значение - в 0 ячейку массива
-
-				summ = 0;
-				for (i_avg = 0; i_avg < AVG_TIM4; i_avg ++ ) // сумма элементов массива
-				{
-					summ = summ + averageTIM4 [i_avg] ;
-				}
-				averageTIM4_temp = summ / AVG_TIM4 ;		// получили среднее
-
-				flag_1PPS_fail = 0;
-
-				counter_AVG_1PPS ++;
-				if ((counter_AVG_1PPS >= AVG_TIM4+2) )//&& (flag_sync_stop == 0) ) 			// количество усреднений равно длине массива +2
-				{
-					counter_AVG_1PPS = AVG_TIM4+2;
-					averageTIM4_ready = averageTIM4_temp; 	// получили среднее значение после 32 усреднений
-					flag_1PPS_AVG_OK = 1; 					// флаг готовности среднего значения 1PPS
-				}
-//					if (counter_AVG_1PPS >= AVG_TIM4+5) 		// количество усреднений равно длине массива +5
-//					{
-//						counter_AVG_1PPS = AVG_TIM4+5;
-//						flag_sync_stop = 1; 					// флаг для теста синхронизации
-//					}
-
-			}
-			else // сбой при измерении периода 1PPS
-			{
-				flag_1PPS_fail = 1;
-				counter_TIM4_fix = 0;
-				//flag_1PPS_AVG_OK = 0;
-				counter_AVG_1PPS = 0;
-			}
-
-
-#ifdef	Debug1PPSMeasurementToUART
-		rprintfInit (Terminal); // инициализация printf (). Вывод в терминал
-		for (i=0; i<10; i++)
+		if ((GPSBuf[i] == ',') && (GPSBuf[i + 1] == '0') && (GPSBuf[i + 2] == ',')) // РїРѕР»Рµ Р±РµР· Р·РЅР°С‡РµРЅРёР№
 		{
-			printf("%d\t", averageTIM4[i] );
+			i += 1;		// РїСЂРѕРїСѓСЃРєР°РµРј РЅРѕР»СЊ РјРµР¶РґСѓ Р·Р°РїСЏС‚С‹РјРё
+			CommaPos++; // РќР°СЂР°С‰РёРІР°РµРј СЃС‡РµС‚С‡РёРє Р·Р°РїСЏС‚С‹С…
+						// printf ("\n\r ,0, i: %d C:%d ",i, CommaPos); // todo
 		}
-		printf("\tc: %d\tTemp: %d\tReady: %d\tfail: %d\tOK: %d\tSt: %d\r\n", counter_AVG_1PPS, averageTIM4_temp, averageTIM4_ready, flag_1PPS_fail, flag_1PPS_AVG_OK, flag_sync_stop );
-#endif
-	}	
-	
+		else
+		{
+			SatUsedGLO[n] = (GPSBuf[i + 1] - 0x30) * 10 + (GPSBuf[i + 2] - 0x30); // РЅРѕРјРµСЂ СЃРїСѓС‚РЅРёРєР°
+
+			CommaPos++; // РќР°СЂР°С‰РёРІР°РµРј СЃС‡РµС‚С‡РёРє Р·Р°РїСЏС‚С‹С…
+			n++;		// СЃС‡РµС‚С‡РёРє СЃРїСѓС‚РЅРёРєРѕРІ
+			i += 2;		// РїРµСЂРµС…РѕРґ РЅР° СЃР»РµРґСѓСЋС‰РµРµ Р·РЅР°С‡РµРЅРёРµ
+						// printf ("\n\r i: %d C:%d ",i, CommaPos); // todo
+		}
+		SatFixGLO = n; // РєРѕР»РёС‡РµСЃС‚РІРѕ СЃРїСѓС‚РЅРёРєРѕРІ GLONASS, РЅР°Р№РґРµРЅРЅС‹С… РїСЂРё РїР°СЂСЃРёРЅРіРµ
+
+		if (CommaPos >= 12) // РґРѕСЃС‚РёРіР»Рё 12-Р№ Р·Р°РїСЏС‚РѕР№
+		{
+			// printf ("\n\r break (C>=12)");
+			break;
+		}
+	}
+	StartDOP = i + 1; // РїРѕР»РѕР¶РµРЅРёРµ Р·Р°РїСЏС‚РѕР№, РїРѕСЃР»Рµ РєРѕС‚РѕСЂРѕР№ РЅР°С‡РёРЅР°СЋС‚СЃСЏ DOP РїР°СЂР°РјРµС‚СЂС‹
+
+	// printf ("\n\r Used SATs: ");
+	// for (i=0; i<12; i++)  // РѕС‡РёСЃС‚РєР° РјР°СЃСЃРёРІР° РЅРѕРјРµСЂРѕРІ РёСЃРїРѕР»СЊР·СѓРµРјС‹С… СЃРїСѓС‚РЅРёРєРѕРІ
+	//{
+	//   printf ("%d ", SatUsed [i] ); 	// todo
+	// }
+
+	// printf ("\n\rStartDOP:%d ", StartDOP); 	// todo
+	// printf ("\n\r");
+	// for (i = StartDOP; i < GPSBUFLENGTH ; i++)   // Р’С‹РІРѕРґ Р±СѓС„РµСЂР° РІ С‚РµСЂРјРёРЅР°Р»
+	//{
+	//	if (GPSBuf[i] == '$') break;
+	//	USART_SendByte(USART1, GPSBuf[i]);
+	// }
+
+	i = 0; // СЃР±СЂРѕСЃ СЃС‡РµС‚С‡РёРєР°
+
+	if ((GPSBuf[StartDOP + i] == ',') && (GPSBuf[StartDOP + i + 1] == '0') && (GPSBuf[StartDOP + i + 2] == ',')) // РїРѕР»Рµ Р±РµР· Р·РЅР°С‡РµРЅРёР№
+	{
+		// PDOP = 0;
+		i += 2;
+	}
+	else
+	{
+		// PDOP = (GPSBuf[StartDOP+i+1]-0x30)*100 + (GPSBuf[StartDOP+i+3]-0x30)*10 + (GPSBuf[StartDOP+i+4]-0x30)*1 ; 	// PDOP*100
+		i += 5;
+	}
+	// printf ("\n\rPDOP:%d ", PDOP); // todo
+
+	if ((GPSBuf[StartDOP + i] == ',') && (GPSBuf[StartDOP + i + 1] == '0') && (GPSBuf[StartDOP + i + 2] == ',')) // РїРѕР»Рµ Р±РµР· Р·РЅР°С‡РµРЅРёР№
+	{
+		// HDOP = 0;
+		i += 2;
+	}
+	else
+	{
+		// HDOP = (GPSBuf[StartDOP+i+1]-0x30)*100 + (GPSBuf[StartDOP+i+3]-0x30)*10 + (GPSBuf[StartDOP+i+4]-0x30)*1; 	// HDOP*100
+		i += 5;
+	}
+	// printf ("\n\rHDOP:%d ", HDOP); // todo
+
+	if ((GPSBuf[StartDOP + i] == ',') && (GPSBuf[StartDOP + i + 1] == '0') && (GPSBuf[StartDOP + i + 2] == '*')) // РїРѕР»Рµ Р±РµР· Р·РЅР°С‡РµРЅРёР№
+	{
+		// VDOP = 0;
+		// i += 2;
+	}
+	else
+	{
+		// VDOP = (GPSBuf[StartDOP+i+1]-0x30)*100 + (GPSBuf[StartDOP+i+3]-0x30)*10 + (GPSBuf[StartDOP+i+4]-0x30)*1; 	// VDOP*100
+		// i += 4;
+	}
+	// printf ("\n\rVDOP:%d ", VDOP); // todo
+
+	// HDOP = (GPSBuf[StartDOP+4]-0x30)*10 + (GPSBuf[StartDOP+4+2]-0x30) ; 	// HDOP*10
+	// VDOP = (GPSBuf[StartDOP+8]-0x30)*10 + (GPSBuf[StartDOP+8+2]-0x30) ; 	// VDOP*10
+
+	return 1;
 }
 
-// --------------------- усреднение измеренных значени	 сигнала 1PPS  --------------------------
-void Average1PPS		(void)
+u8 NMEA_Parser_GGA(void)
 {
-//--------------------------------- импульс 1PPS -----------------------------------------
-	   if (flag_1PPS_pulse == 1) 	// пришел импульс 1PPS от таймера или от внешнего прерывания
-	   {
-//OnLED0();
-		   flag_1PPS_pulse = 0;
+	u8 CommaPos = 0;
+	u8 k = 0;
+	u16 i, StartPos = 0; // РќР°С‡Р°Р»Рѕ СЃС‚СЂРѕРєРё
 
-			if (flag_1PPS_AVG_OK == 0)		// если после сброса среднее значение периода 1PPS еще ни разу не получено
-			   	{
-				OnLED0();				//
-				counterLed0 = 500; 		// зажигаем синий светодиод на 500 мс
-			   	}
-			else
-				{
+	while (!((GPSBuf[StartPos] == '$') && (GPSBuf[StartPos + 3] == 'G') && (GPSBuf[StartPos + 4] == 'G') && (GPSBuf[StartPos + 5] == 'A')) && StartPos < 7)
+		StartPos++;
+	// printf ("\n\r GGA Parser: "); // todo
+	// printf ("\n\r StartPos = %d", StartPos); // todo
+	//  РЅР°С‡Р°Р»Рѕ РїР°РєРµС‚Р° СЃР»РёС€РєРѕРј СЃРёР»СЊРЅРѕ СЃРјРµС‰РµРЅРѕ, РѕС‚Р±СЂР°СЃС‹РІР°РµРј РїР°РєРµС‚
+	if (StartPos > 5)
+	{
+		// printf ("\n\rStartPos>5\n\r");
+		return 0;
+	}
 
-				}
+	if (ControlCheckSum(StartPos) == 0)
+	{
+		// printf ("\n\r GGA CRC ERROR!"); // todo
+		// return 0; // РџСЂРѕРІРµСЂРєР° РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹ todo
+	}
+	else
+	{
+		// printf ("\n\r GGA CRC OK"); // todo
+	}
 
-			sec_GPS_to_display = GPSTimeSec + 1 ; 	// секунды от GPS для отображения, сдвиг на одну
-			sec_RTC_to_display = SecRTC ;			// секунды от таймера 1 для отображения
+	memset(&GPSFixData, 0, sizeof(GPSFixData)); // РћС‡РёС‰Р°РµРј СЃС‚СЂСѓРєС‚СѓСЂСѓ
 
-			sec_div = SecRTC % 60;		// определяем номер текущей секунды, отбрасываем целое количество минут
-			if ( sec_div == 0+LoraTxTime || sec_div == 10+LoraTxTime || sec_div == 20+LoraTxTime || sec_div == 30+LoraTxTime || sec_div == 40+LoraTxTime || sec_div == 50+LoraTxTime ) // проверка времени для передачи
+	for (i = StartPos + 6; i < GPSBUFLENGTH; i++) // Р–РґРµРј РёР»Рё РєРѕРЅС†Р° Р±СѓС„РµСЂР° РёР»Рё 10-Р№ Р·Р°РїСЏС‚РѕР№
+	{
+		if (GPSBuf[i] == ',')
+		{
+			CommaPos++; // РќР°СЂР°С‰РёРІР°РµРј СЃС‡РµС‚С‡РёРє Р·Р°РїСЏС‚С‹С…
+			k = 0;
+		}
+		else
+			switch (CommaPos) // РџРѕР»СЊР·СѓРµРјСЃСЏ С‚РµРј, С‡С‚Рѕ РґР°РЅРЅС‹Рµ СЂР°Р·РґРµР»СЏСЋС‚СЃСЏ Р·Р°РїСЏС‚С‹РјРё. РќРµРѕРїСЂРµРґРµР»РµРЅРЅС‹Рµ РґР°РЅРЅС‹Рµ (РґРІРµ Р·Р°РїСЏС‚С‹Рµ РїРѕРґСЂСЏРґ) РјС‹ Р·Р°РјРµРЅРёР»Рё РЅСѓР»РµРј РІ РѕР±СЂР°Р±РѕС‚С‡РёРєРµ РїСЂРµСЂС‹РІР°РЅРёСЏ USART1_IRQHandler()
 			{
-				flagTX = 1;			// передача по радиоканалу разрешена
-				//flagTXDisplay = 1;	// флаг для отображения
+			// РџРѕСЃР»Рµ РїРµСЂРІРѕР№ Р·Р°РїСЏС‚РѕР№ РёРґРµС‚ РІСЂРµРјСЏ, РЅРѕ РјС‹ РІРѕР·СЊРјРµРј РµРіРѕ РїРѕР·Р¶Рµ РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё, СЃРёРЅС…СЂРѕРЅРЅРѕ СЃ РґР°С‚РѕР№
+			case 2:
+				if (k < sizeof(GPSFixData.Latitude) - 1)
+					GPSFixData.Latitude[k++] = GPSBuf[i];
+				break;
+			case 3:
+				if (k < sizeof(GPSFixData.NS))
+					GPSFixData.NS = GPSBuf[i];
+				break;
+			case 4:
+				if (k < sizeof(GPSFixData.Longitude) - 1)
+					GPSFixData.Longitude[k++] = GPSBuf[i];
+				break;
+			case 5:
+				if (k < sizeof(GPSFixData.EW))
+					GPSFixData.EW = GPSBuf[i];
+				break;
+			case 6:
+				if (k < sizeof(GPSFixData.ReceiverMode))
+					GPSFixData.ReceiverMode = GPSBuf[i];
+				break;
+			case 7:
+				if (k < sizeof(GPSFixData.SatelliteNum) - 1)
+					GPSFixData.SatelliteNum[k++] = GPSBuf[i];
+				break;
+			case 9:
+				if (k < sizeof(GPSFixData.Altitude) - 1)
+					GPSFixData.Altitude[k++] = GPSBuf[i];
+				break;
+			case 10:
+				return 1;
+				break;
+			default:
+				break;
 			}
-		//	if ( sec_div == 0+LoraTxTime+1 || sec_div == 10+LoraTxTime+1 || sec_div == 20+LoraTxTime+1 || sec_div == 30+LoraTxTime+1 || sec_div == 40+LoraTxTime+1 || sec_div == 50+LoraTxTime+1 ) // проверка времени для передачи
-		//	{
-		//		flagTXDisplay = 0;	// гасим флаг для отображения на следующей секунде todo переделать на таймер sysclk
-		//	}
-//OffLED0();
+	}
+	return 1;
+}
+
+u8 NMEA_Parser_ZDA(void)
+{
+	u8 CommaPos = 0;
+	u8 k;				 // РџСЂРѕСЃС‚Рѕ СЃС‡РµС‚С‡РёРє
+	u16 i, StartPos = 0; // РќР°С‡Р°Р»Рѕ СЃС‚СЂРѕРєРё
+
+	while (!((GPSBuf[StartPos] == '$') && (GPSBuf[StartPos + 3] == 'Z') && (GPSBuf[StartPos + 4] == 'D') && (GPSBuf[StartPos + 5] == 'A')) && StartPos < (GPSBUFLENGTH - sizeof("$GNZDA,hhmmss.ss,dd,mm,yyyy,+hh,mm*cs") + 1))
+		StartPos++;
+	// printf ("\n\r ZGA Parser: "); // todo
+	// printf ("\n\r StartPos = %d", StartPos); // todo
+	//  РЅР°С‡Р°Р»Рѕ РїР°РєРµС‚Р° СЃР»РёС€РєРѕРј СЃРёР»СЊРЅРѕ СЃРјРµС‰РµРЅРѕ, РѕС‚Р±СЂР°СЃС‹РІР°РµРј СЌС‚РѕС‚ РїР°РєРµС‚
+	if (StartPos > (GPSBUFLENGTH - sizeof("$GNZDA,hhmmss.ss,dd,mm,yyyy,+hh,mm*cs") - 1))
+	{
+		// printf ("\n\r ZDA offset ERROR!"); // todo
+		return 0;
+	}
+
+	if (ControlCheckSum(StartPos) == 0) // РџСЂРѕРІРµСЂРєР° РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹
+	{
+		// printf ("\n\r ZDA CRC ERROR!"); // todo
+		return 0; // РџСЂРѕРІРµСЂРєР° РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹
+	}
+	// printf ("\n\r ZDA CRC OK"); // todo
+
+	for (i = StartPos + 5; i < GPSBUFLENGTH; i++) // Р–РґРµРј РёР»Рё РєРѕРЅС†Р° Р±СѓС„РµСЂР° РёР»Рё 7-Р№ Р·Р°РїСЏС‚РѕР№
+	{
+		if (GPSBuf[i] == ',')
+		{
+			CommaPos++; // РќР°СЂР°С‰РёРІР°РµРј СЃС‡РµС‚С‡РёРє Р·Р°РїСЏС‚С‹С…
+			k = 0;
+		}
+		else
+			switch (CommaPos) // РџРѕР»СЊР·СѓРµРјСЃСЏ С‚РµРј, С‡С‚Рѕ РґР°РЅРЅС‹Рµ СЂР°Р·РґРµР»СЏСЋС‚СЃСЏ Р·Р°РїСЏС‚С‹РјРё. РќРµРѕРїСЂРµРґРµР»РµРЅРЅС‹Рµ РґР°РЅРЅС‹Рµ (РґРІРµ Р·Р°РїСЏС‚С‹Рµ РїРѕРґСЂСЏРґ) РјС‹ Р·Р°РјРµРЅРёР»Рё РЅСѓР»РµРј РІ РѕР±СЂР°Р±РѕС‚С‡РёРєРµ РїСЂРµСЂС‹РІР°РЅРёСЏ USART1_IRQHandler()
+			{
+			case 1:
+				if (k < sizeof(GPSFixData.Time) - 1)
+					GPSFixData.Time[k++] = GPSBuf[i];
+				break;
+			case 2:
+				if (k < sizeof(GPSFixData.Day) - 1)
+					GPSFixData.Day[k++] = GPSBuf[i];
+				break;
+			case 3:
+				if (k < sizeof(GPSFixData.Month) - 1)
+					GPSFixData.Month[k++] = GPSBuf[i];
+				break;
+			case 4:
+				if (k < sizeof(GPSFixData.Year) - 1)
+					GPSFixData.Year[k++] = GPSBuf[i];
+				break;
+			case 5:
+				if (k < sizeof(GPSFixData.LocalTimeHr) - 1)
+					GPSFixData.LocalTimeHr[k++] = GPSBuf[i];
+				break;
+			case 6:
+				if (k < sizeof(GPSFixData.LocalTimeMn) - 1)
+					GPSFixData.LocalTimeMn[k++] = GPSBuf[i];
+				break;
+			case 7:
+				return 1;
+				break;
+			default:
+				break;
+			}
+	}
+	return 1;
+}
+
+u32 GetGPSTimeSec(void) // РІС‹Р·С‹РІР°С‚СЊ РїРѕСЃР»Рµ РїР°СЂСЃРёРЅРіР° ZDA СЃРµРЅС‚РµРЅС†РёРё
+{
+	u32 THH = 0, TMM = 0, TSS = 0;
+	THH = (GPSFixData.Time[0] - 0x30) * 10 + (GPSFixData.Time[1] - 0x30); // С‡Р°СЃС‹ РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё
+	TMM = (GPSFixData.Time[2] - 0x30) * 10 + (GPSFixData.Time[3] - 0x30); // РјРёРЅСѓС‚С‹ РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё
+	TSS = (GPSFixData.Time[4] - 0x30) * 10 + (GPSFixData.Time[5] - 0x30); // СЃРµРєСѓРЅРґС‹ РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё
+	// TmSmS = (GPSFixData.Time[7]-0x30)*10 + (GPSFixData.Time[8]-0x30);	// РґСЂРѕР±РЅР°СЏ С‡Р°СЃС‚СЊ СЃРµРєСѓРЅРґ РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё
+
+	return ((THH * 3600 + TMM * 60 + TSS)); // РІРѕР·РІСЂР°С‰Р°РµРј С†РµР»РѕРµ С‡РёСЃР»Рѕ СЃРµРєСѓРЅРґ Р·Р° С‚РµРєСѓС‰РёРµ СЃСѓС‚РєРё, Р±РµР· РґСЂРѕР±РЅРѕР№ С‡Р°СЃС‚Рё
+}
+u32 GetGPSTimeMilliSec(void) // РІС‹Р·С‹РІР°С‚СЊ РїРѕСЃР»Рµ РїР°СЂСЃРёРЅРіР° ZDA СЃРµРЅС‚РµРЅС†РёРё
+{
+	u32 TmSmS;
+	TmSmS = (GPSFixData.Time[7] - 0x30) * 10 + (GPSFixData.Time[8] - 0x30); // РґСЂРѕР±РЅР°СЏ С‡Р°СЃС‚СЊ СЃРµРєСѓРЅРґ РёР· ZDA СЃРµРЅС‚РµРЅС†РёРё
+	return (TmSmS);															// РІРѕР·РІСЂР°С‰Р°РµРј РґСЂРѕР±РЅСѓСЋ С‡Р°СЃС‚СЊ
+}
+
+u8 NMEA_Parser_GSV_GPS(void)
+{
+	u8 CommaPos = 0;
+	u8 k = 0; // РџСЂРѕСЃС‚Рѕ СЃС‡РµС‚С‡РёРє
+	u16 i = 0;
+
+	while (!((GPSBuf[GSVStartPos] == '$') && (GPSBuf[GSVStartPos + 2] == 'P') // С‚РѕР»СЊРєРѕ GPS СЃРїСѓС‚РЅРёРєРё
+			 && (GPSBuf[GSVStartPos + 3] == 'G') && (GPSBuf[GSVStartPos + 4] == 'S') && (GPSBuf[GSVStartPos + 5] == 'V')) &&
+		   GSVStartPos < (GPSBUFLENGTH - sizeof("$GPGSV,n,n,nn,11,22,333,44,11,22,333,44,11,22,333,44,11,22,333,44*cs") + 1))
+		GSVStartPos++; // РѕРїСЂРµРґРµР»СЏРµРј РЅР°С‡Р°Р»Рѕ РѕС‡РµСЂРµРґРЅРѕР№ GSV СЃС‚СЂРѕРєРё РІ РїРѕСЃС‹Р»РєРµ
+
+	// РЅР°С‡Р°Р»Рѕ РїР°РєРµС‚Р° СЃР»РёС€РєРѕРј СЃРёР»СЊРЅРѕ СЃРјРµС‰РµРЅРѕ, РѕС‚Р±СЂР°СЃС‹РІР°РµРј РµРіРѕ
+	if (GSVStartPos > (GPSBUFLENGTH - sizeof("$GPGSV,n,n,nn,11,22,333,44,11,22,333,44,11,22,333,44,11,22,333,44*cs") - 1))
+	{
+		// printf ("\n\r return 0 offset so big "); // todo
+		return 0;
+	}
+
+	GSVNumStringGPS = GPSBuf[GSVStartPos + 7] - 0x30; // РєРѕР»РёС‡РµСЃС‚РІРѕ GSV-GPS СЃС‚СЂРѕРє РІ РїРѕСЃС‹Р»РєРµ
+
+	if (ControlCheckSum(GSVStartPos) == 0)
+	{
+		// printf ("\t\tGSV CRC error! "); // todo
+		//  return 0;  // РџСЂРѕРІРµСЂРєР° РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹
+	}
+
+	for (i = GSVStartPos + 5; i < GPSBUFLENGTH; i++) // Р–РґРµРј РёР»Рё РєРѕРЅС†Р° Р±СѓС„РµСЂР° РёР»Рё * РІ РїСЂРёРµРјРЅРѕРј Р±СѓС„РµСЂРµ
+	{
+		if (GPSBuf[i] == '*')
+		{
+			GSVStartPos = i; // СЃРґРІРёРЅСѓР»Рё РЅР°С‡Р°Р»Рѕ Р·Р° С‚РµРєСѓС‰СѓСЋ СЃС‚СЂРѕРєСѓ
+			SatNumGPS++;	 // РќР°СЂР°С‰РёРІР°РµРј РЅРѕРјРµСЂ С‚РµРєСѓС‰РµРіРѕ СЃРїСѓС‚РЅРёРєР°
+			// printf ("\n\rGPSSatNum(*): \t%d \tstart: %d", SatNum, GSVStartPos); // todo
+			return 1;
 		}
 
+		if (GPSBuf[i] == ',')
+		{
+			if ((CommaPos == 7) || (CommaPos == 11) || (CommaPos == 15) || (CommaPos == 19))
+			{
+				SatNumGPS++; // РќР°СЂР°С‰РёРІР°РµРј РЅРѕРјРµСЂ С‚РµРєСѓС‰РµРіРѕ СЃРїСѓС‚РЅРёРєР°
+							 // printf ("\n\rGPSSatNum(,): \t%d \tstart: %d", SatNum, GSVStartPos); // todo
+			}
+			CommaPos++;
+			k = 0; // РќР°СЂР°С‰РёРІР°РµРј СЃС‡РµС‚С‡РёРє Р·Р°РїСЏС‚С‹С…
+		}
+		else
+			switch (CommaPos) // РџРѕР»СЊР·СѓРµРјСЃСЏ С‚РµРј, С‡С‚Рѕ РґР°РЅРЅС‹Рµ СЂР°Р·РґРµР»СЏСЋС‚СЃСЏ Р·Р°РїСЏС‚С‹РјРё. РќРµРѕРїСЂРµРґРµР»РµРЅРЅС‹Рµ РґР°РЅРЅС‹Рµ (РґРІРµ Р·Р°РїСЏС‚С‹Рµ РїРѕРґСЂСЏРґ) РјС‹ Р·Р°РјРµРЅРёР»Рё РЅСѓР»РµРј РІ РѕР±СЂР°Р±РѕС‚С‡РёРєРµ РїСЂРµСЂС‹РІР°РЅРёСЏ USART1_IRQHandler()
+			{				  // РџРѕСЃР»Рµ РїРµСЂРІС‹С… С‚СЂРµС… Р·Р°РїСЏС‚С‹С… РёРґРµС‚ РёРЅС„РѕСЂРјР°С†РёСЏ РѕР± РѕР±С‰РµРј РєРѕР»РёС‡РµСЃС‚РІРµ СЃРїСѓС‚РЅРёРєРѕРІ, РѕР± РѕР±С‰РµРј РєРѕР»РёС‡РµСЃС‚РІРµ GSV РїРѕСЃС‹Р»РѕРє Рё Рѕ РЅРѕРјРµСЂРµ СЌС‚РѕР№ РєРѕРЅРєСЂРµС‚РЅРѕР№ GSV РїРѕСЃС‹Р»РєРё. Р­С‚Р° РёРЅС„РѕСЂРјР°С†РёСЏ РЅР°Рј РЅРµ РЅСѓР¶РЅР°
+			case 4:
+			case 8:
+			case 12:
+			case 16:
+				if (k < sizeof(ONESAT) - 1)
+					GPSFixData.Sats[SatNumGPS][0][k++] = GPSBuf[i];
+				break; // РќРѕРјРµСЂ СЃРїСѓС‚РЅРёРєР°. case 4: case 8: case 12: case 16: - РЅРѕРјРµСЂР° Р·Р°РїСЏС‚С‹С…,
+					   //		РїРѕСЃР»Рµ РєРѕС‚РѕСЂС‹С… РёРґРµС‚ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰Р°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ. Р’ РєР°Р¶РґРѕР№ GSV РїРѕСЃС‹Р»РєРµ РµСЃС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ РјР°РєСЃРёРјСѓРј 4-С… СЃРїСѓС‚РЅРёРєР°С…, РїРѕСЌС‚РѕРјСѓ 20-СЋ Р·Р°РїСЏС‚СѓСЋ РјРѕР¶РЅРѕ РЅРµ РѕР±СЂР°Р±Р°С‚С‹РІР°С‚СЊ
+			case 5:
+			case 9:
+			case 13:
+			case 17:
+				if (k < sizeof(ONESAT) - 1)
+					GPSFixData.Sats[SatNumGPS][1][k++] = GPSBuf[i];
+				break; // РЈРіРѕР» РјРµСЃС‚Р°
+			case 6:
+			case 10:
+			case 14:
+			case 18:
+				if (k < sizeof(ONESAT) - 1)
+					GPSFixData.Sats[SatNumGPS][2][k++] = GPSBuf[i];
+				break; // РђР·РёРјСѓС‚
+			case 7:
+			case 11:
+			case 15:
+			case 19:
+				if (k < sizeof(ONESAT) - 1)
+					GPSFixData.Sats[SatNumGPS][3][k++] = GPSBuf[i];
+				break; // РЈСЂРѕРІРµРЅСЊ СЃРёРіРЅР°Р»Р°, SNR
+			default:
+				break;
+			}
+	}
+	return 1;
+}
+
+u8 NMEA_Parser_GSV_GLO(void)
+{
+	u8 CommaPos = 0;
+	u8 k = 0; // РџСЂРѕСЃС‚Рѕ СЃС‡РµС‚С‡РёРє
+	u16 i = 0;
+
+	while (!((GPSBuf[GSVStartPos] == '$') && (GPSBuf[GSVStartPos + 2] == 'L') // С‚РѕР»СЊРєРѕ GLONASS СЃРїСѓС‚РЅРёРєРё
+			 && (GPSBuf[GSVStartPos + 3] == 'G') && (GPSBuf[GSVStartPos + 4] == 'S') && (GPSBuf[GSVStartPos + 5] == 'V')) &&
+		   GSVStartPos < (GPSBUFLENGTH - sizeof("$GPGSV,n,n,nn,11,22,333,44,11,22,333,44,11,22,333,44,11,22,333,44*cs") + 1))
+		GSVStartPos++;
+
+	// РЅР°С‡Р°Р»Рѕ РїР°РєРµС‚Р° СЃР»РёС€РєРѕРј СЃРёР»СЊРЅРѕ СЃРјРµС‰РµРЅРѕ, РѕС‚Р±СЂР°СЃС‹РІР°РµРј РµРіРѕ
+	if (GSVStartPos > (GPSBUFLENGTH - sizeof("$GPGSV,n,n,nn,11,22,333,44,11,22,333,44,11,22,333,44,11,22,333,44*cs") - 1))
+	{
+		// printf ("\n\r return 0 offset so big "); // todo
+		return 0;
+	}
+
+	GSVNumStringGLO = GPSBuf[GSVStartPos + 7] - 0x30; // РєРѕР»РёС‡РµСЃС‚РІРѕ GSV-GLONASS СЃС‚СЂРѕРє РІ РїРѕСЃС‹Р»РєРµ
+
+	if (ControlCheckSum(GSVStartPos) == 0)
+	{
+		// printf ("\t\tGSV CRC error! "); // todo
+		//  return 0;  // РџСЂРѕРІРµСЂРєР° РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹
+	}
+
+	for (i = GSVStartPos + 5; i < GPSBUFLENGTH; i++) // Р–РґРµРј РёР»Рё РєРѕРЅС†Р° Р±СѓС„РµСЂР° РёР»Рё * РІ РїСЂРёРµРјРЅРѕРј Р±СѓС„РµСЂРµ
+	{
+		if (GPSBuf[i] == '*')
+		{
+			GSVStartPos = i;
+			SatNumGLO++;
+			// printf ("\n\rGLOSatNum(*): \t%d \tstart: %d ", SatNumGLO, GSVStartPos); // todo
+			return 1;
+		}
+
+		if (GPSBuf[i] == ',')
+		{
+			if ((CommaPos == 7) || (CommaPos == 11) || (CommaPos == 15) || (CommaPos == 19))
+			{
+				SatNumGLO++; // РќР°СЂР°С‰РёРІР°РµРј РЅРѕРјРµСЂ С‚РµРєСѓС‰РµРіРѕ СЃРїСѓС‚РЅРёРєР°
+							 // printf ("\n\rGLOSatNum(,): \t%d \tstart: %d ", SatNumGLO, GSVStartPos); // todo
+			}
+			CommaPos++;
+			k = 0; // РќР°СЂР°С‰РёРІР°РµРј СЃС‡РµС‚С‡РёРє Р·Р°РїСЏС‚С‹С…
+		}
+		else
+			switch (CommaPos) // РџРѕР»СЊР·СѓРµРјСЃСЏ С‚РµРј, С‡С‚Рѕ РґР°РЅРЅС‹Рµ СЂР°Р·РґРµР»СЏСЋС‚СЃСЏ Р·Р°РїСЏС‚С‹РјРё. РќРµРѕРїСЂРµРґРµР»РµРЅРЅС‹Рµ РґР°РЅРЅС‹Рµ (РґРІРµ Р·Р°РїСЏС‚С‹Рµ РїРѕРґСЂСЏРґ) РјС‹ Р·Р°РјРµРЅРёР»Рё РЅСѓР»РµРј РІ РѕР±СЂР°Р±РѕС‚С‡РёРєРµ РїСЂРµСЂС‹РІР°РЅРёСЏ USART1_IRQHandler()
+			{				  // РџРѕСЃР»Рµ РїРµСЂРІС‹С… С‚СЂРµС… Р·Р°РїСЏС‚С‹С… РёРґРµС‚ РёРЅС„РѕСЂРјР°С†РёСЏ РѕР± РѕР±С‰РµРј РєРѕР»РёС‡РµСЃС‚РІРµ СЃРїСѓС‚РЅРёРєРѕРІ, РѕР± РѕР±С‰РµРј РєРѕР»РёС‡РµСЃС‚РІРµ GSV РїРѕСЃС‹Р»РѕРє Рё Рѕ РЅРѕРјРµСЂРµ СЌС‚РѕР№ РєРѕРЅРєСЂРµС‚РЅРѕР№ GSV РїРѕСЃС‹Р»РєРё. Р­С‚Р° РёРЅС„РѕСЂРјР°С†РёСЏ РЅР°Рј РЅРµ РЅСѓР¶РЅР°
+			case 4:
+			case 8:
+			case 12:
+			case 16:
+				if (k < sizeof(ONESAT) - 1)
+					GPSFixData.SatsGLO[SatNumGLO][0][k++] = GPSBuf[i];
+				break; // РќРѕРјРµСЂ СЃРїСѓС‚РЅРёРєР°. case 4: case 8: case 12: case 16: - РЅРѕРјРµСЂР° Р·Р°РїСЏС‚С‹С…, РїРѕСЃР»Рµ РєРѕС‚РѕСЂС‹С… РёРґРµС‚ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰Р°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ. Р’ РєР°Р¶РґРѕР№ GSV РїРѕСЃС‹Р»РєРµ РµСЃС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ РјР°РєСЃРёРјСѓРј 4-С… СЃРїСѓС‚РЅРёРєР°С…, РїРѕСЌС‚РѕРјСѓ 20-СЋ Р·Р°РїСЏС‚СѓСЋ РјРѕР¶РЅРѕ РЅРµ РѕР±СЂР°Р±Р°С‚С‹РІР°С‚СЊ
+			case 5:
+			case 9:
+			case 13:
+			case 17:
+				if (k < sizeof(ONESAT) - 1)
+					GPSFixData.SatsGLO[SatNumGLO][1][k++] = GPSBuf[i];
+				break; // РЈРіРѕР» РјРµСЃС‚Р°
+			case 6:
+			case 10:
+			case 14:
+			case 18:
+				if (k < sizeof(ONESAT) - 1)
+					GPSFixData.SatsGLO[SatNumGLO][2][k++] = GPSBuf[i];
+				break; // РђР·РёРјСѓС‚
+			case 7:
+			case 11:
+			case 15:
+			case 19:
+				if (k < sizeof(ONESAT) - 1)
+					GPSFixData.SatsGLO[SatNumGLO][3][k++] = GPSBuf[i];
+				break; // РЈСЂРѕРІРµРЅСЊ СЃРёРіРЅР°Р»Р°, SNR
+			default:
+				break;
+			}
+	}
+	return 1;
+}
+
+u8 ControlCheckSum(u16 StartIndex)
+{
+	u8 CheckSum = 0, MessageCheckSum = 0; // РљРѕРЅС‚СЂРѕР»СЊРЅР°СЏ СЃСѓРјРјР°
+	u16 i = StartIndex + 1;				  // РЎРјРµС‰Р°РµРјСЃСЏ РЅР° РѕРґРёРЅ С€Р°Рі РІРїСЂР°РІРѕ РѕС‚ СЃРёРјРІРѕР»Р° $
+
+	while (GPSBuf[i] != '*')
+	{
+		CheckSum ^= GPSBuf[i];
+		if (++i == GPSBUFLENGTH)
+			return 0; // РќРµ РЅР°Р№РґРµРЅ РїСЂРёР·РЅР°Рє РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹
+	}
+
+	if (GPSBuf[++i] > 0x40)
+		MessageCheckSum = (GPSBuf[i] - 0x37) << 4; // РЈСЃР»РѕРІРёРµ РґР»СЏ РєРѕСЂСЂРµРєС‚РЅРѕР№ РѕР±СЂР°Р±РѕС‚РєРё РґРµСЃСЏС‚РёС‡РЅС‹С…
+	else
+		MessageCheckSum = (GPSBuf[i] - 0x30) << 4; // Рё С€РµСЃС‚РЅР°РґС†Р°С‚РёСЂРёС‡РЅС‹С… С‡РёСЃРµР», РїСЂРµРґСЃС‚Р°РІР»РµРЅРЅС‹С… РІ РєРѕРґРµ ASCII
+	if (GPSBuf[++i] > 0x40)
+		MessageCheckSum += (GPSBuf[i] - 0x37);
+	else
+		MessageCheckSum += (GPSBuf[i] - 0x30);
+
+	if (MessageCheckSum != CheckSum)
+		return 0; // РќРµРїСЂР°РІРёР»СЊРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ СЃСѓРјРјС‹
+
+	return 1; // Р’СЃРµ РћРљ
+}
+
+//-------------------- РёР·РјРµСЂРµРЅРёРµ, СѓСЃСЂРµРґРЅРµРЅРёРµ Рё РїСЂРѕРІРµСЂРєР° РїРµСЂРёРѕРґР° СЃРёРіРЅР°Р»Р° 1PPS -------------------
+void Measurement1PPS(void)
+{
+	if (flag_1PPS_Update == 1) // РѕР±РЅРѕРІРёР»РѕСЃСЊ Р·РЅР°С‡РµРЅРёРµ
+	{
+		flag_1PPS_Update = 0; // СЃР±СЂРѕСЃ С„Р»Р°РіР° РґР»СЏ РѕРґРЅРѕРєСЂР°С‚РЅРѕРіРѕ СЃСЂР°Р±Р°С‚С‹РІР°РЅРёСЏ СѓСЃСЂРµРґРЅРµРЅРёСЏ
+
+		if ((TIM4_fix >= 37000) && (TIM4_fix <= 37400) && (counter_TIM4_fix >= 90) && (counter_TIM4_fix <= 92))
+		{ // РїРµСЂРёРѕРґ 1PPS РІ РїСЂРµРґРµР»Р°С… РЅРѕСЂРјС‹
+
+			for (i_avg = AVG_TIM4 - 1; i_avg > 0; i_avg--) // СЃРґРІРёРі РґР°РЅРЅС‹С… РІ РјР°СЃСЃРёРІРµ РІРїСЂР°РІРѕ
+			{
+				averageTIM4[i_avg] = averageTIM4[i_avg - 1];
+			}
+			averageTIM4[0] = TIM4_fix; // С‚РµРєСѓС‰РµРµ Р·РЅР°С‡РµРЅРёРµ - РІ 0 СЏС‡РµР№РєСѓ РјР°СЃСЃРёРІР°
+
+			summ = 0;
+			for (i_avg = 0; i_avg < AVG_TIM4; i_avg++) // СЃСѓРјРјР° СЌР»РµРјРµРЅС‚РѕРІ РјР°СЃСЃРёРІР°
+			{
+				summ = summ + averageTIM4[i_avg];
+			}
+			averageTIM4_temp = summ / AVG_TIM4; // РїРѕР»СѓС‡РёР»Рё СЃСЂРµРґРЅРµРµ
+
+			flag_1PPS_fail = 0;
+
+			counter_AVG_1PPS++;
+			if ((counter_AVG_1PPS >= AVG_TIM4 + 2)) //&& (flag_sync_stop == 0) ) 			// РєРѕР»РёС‡РµСЃС‚РІРѕ СѓСЃСЂРµРґРЅРµРЅРёР№ СЂР°РІРЅРѕ РґР»РёРЅРµ РјР°СЃСЃРёРІР° +2
+			{
+				counter_AVG_1PPS = AVG_TIM4 + 2;
+				averageTIM4_ready = averageTIM4_temp; // РїРѕР»СѓС‡РёР»Рё СЃСЂРµРґРЅРµРµ Р·РЅР°С‡РµРЅРёРµ РїРѕСЃР»Рµ 32 СѓСЃСЂРµРґРЅРµРЅРёР№
+				flag_1PPS_AVG_OK = 1;				  // С„Р»Р°Рі РіРѕС‚РѕРІРЅРѕСЃС‚Рё СЃСЂРµРґРЅРµРіРѕ Р·РЅР°С‡РµРЅРёСЏ 1PPS
+			}
+			//					if (counter_AVG_1PPS >= AVG_TIM4+5) 		// РєРѕР»РёС‡РµСЃС‚РІРѕ СѓСЃСЂРµРґРЅРµРЅРёР№ СЂР°РІРЅРѕ РґР»РёРЅРµ РјР°СЃСЃРёРІР° +5
+			//					{
+			//						counter_AVG_1PPS = AVG_TIM4+5;
+			//						flag_sync_stop = 1; 					// С„Р»Р°Рі РґР»СЏ С‚РµСЃС‚Р° СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё
+			//					}
+		}
+		else // СЃР±РѕР№ РїСЂРё РёР·РјРµСЂРµРЅРёРё РїРµСЂРёРѕРґР° 1PPS
+		{
+			flag_1PPS_fail = 1;
+			counter_TIM4_fix = 0;
+			// flag_1PPS_AVG_OK = 0;
+			counter_AVG_1PPS = 0;
+		}
+
+#ifdef Debug1PPSMeasurementToUART
+		rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+		for (i = 0; i < 10; i++)
+		{
+			printf("%d\t", averageTIM4[i]);
+		}
+		printf("\tc: %d\tTemp: %d\tReady: %d\tfail: %d\tOK: %d\tSt: %d\r\n", counter_AVG_1PPS, averageTIM4_temp, averageTIM4_ready, flag_1PPS_fail, flag_1PPS_AVG_OK, flag_sync_stop);
+#endif
+	}
+}
+
+// --------------------- СѓСЃСЂРµРґРЅРµРЅРёРµ РёР·РјРµСЂРµРЅРЅС‹С… Р·РЅР°С‡РµРЅРё	 СЃРёРіРЅР°Р»Р° 1PPS  --------------------------
+void Average1PPS(void)
+{
+	//--------------------------------- РёРјРїСѓР»СЊСЃ 1PPS -----------------------------------------
+	if (flag_1PPS_pulse == 1) // РїСЂРёС€РµР» РёРјРїСѓР»СЊСЃ 1PPS РѕС‚ С‚Р°Р№РјРµСЂР° РёР»Рё РѕС‚ РІРЅРµС€РЅРµРіРѕ РїСЂРµСЂС‹РІР°РЅРёСЏ
+	{
+		// OnLED0();
+		flag_1PPS_pulse = 0;
+
+		if (flag_1PPS_AVG_OK == 0) // РµСЃР»Рё РїРѕСЃР»Рµ СЃР±СЂРѕСЃР° СЃСЂРµРґРЅРµРµ Р·РЅР°С‡РµРЅРёРµ РїРµСЂРёРѕРґР° 1PPS РµС‰Рµ РЅРё СЂР°Р·Сѓ РЅРµ РїРѕР»СѓС‡РµРЅРѕ
+		{
+			OnLED0();		   //
+			counterLed0 = 500; // Р·Р°Р¶РёРіР°РµРј СЃРёРЅРёР№ СЃРІРµС‚РѕРґРёРѕРґ РЅР° 500 РјСЃ
+		}
+		else
+		{
+		}
+
+		sec_GPS_to_display = GPSTimeSec + 1; // СЃРµРєСѓРЅРґС‹ РѕС‚ GPS РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ, СЃРґРІРёРі РЅР° РѕРґРЅСѓ
+		sec_RTC_to_display = SecRTC;		 // СЃРµРєСѓРЅРґС‹ РѕС‚ С‚Р°Р№РјРµСЂР° 1 РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ
+
+		sec_div = SecRTC % 60;																																								 // РѕРїСЂРµРґРµР»СЏРµРј РЅРѕРјРµСЂ С‚РµРєСѓС‰РµР№ СЃРµРєСѓРЅРґС‹, РѕС‚Р±СЂР°СЃС‹РІР°РµРј С†РµР»РѕРµ РєРѕР»РёС‡РµСЃС‚РІРѕ РјРёРЅСѓС‚
+		if (sec_div == 0 + LoraTxTime || sec_div == 10 + LoraTxTime || sec_div == 20 + LoraTxTime || sec_div == 30 + LoraTxTime || sec_div == 40 + LoraTxTime || sec_div == 50 + LoraTxTime) // РїСЂРѕРІРµСЂРєР° РІСЂРµРјРµРЅРё РґР»СЏ РїРµСЂРµРґР°С‡Рё
+		{
+			flagTX = 1; // РїРµСЂРµРґР°С‡Р° РїРѕ СЂР°РґРёРѕРєР°РЅР°Р»Сѓ СЂР°Р·СЂРµС€РµРЅР°
+						// flagTXDisplay = 1;	// С„Р»Р°Рі РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ
+		}
+		//	if ( sec_div == 0+LoraTxTime+1 || sec_div == 10+LoraTxTime+1 || sec_div == 20+LoraTxTime+1 || sec_div == 30+LoraTxTime+1 || sec_div == 40+LoraTxTime+1 || sec_div == 50+LoraTxTime+1 ) // РїСЂРѕРІРµСЂРєР° РІСЂРµРјРµРЅРё РґР»СЏ РїРµСЂРµРґР°С‡Рё
+		//	{
+		//		flagTXDisplay = 0;	// РіР°СЃРёРј С„Р»Р°Рі РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РЅР° СЃР»РµРґСѓСЋС‰РµР№ СЃРµРєСѓРЅРґРµ todo РїРµСЂРµРґРµР»Р°С‚СЊ РЅР° С‚Р°Р№РјРµСЂ sysclk
+		//	}
+		// OffLED0();
+	}
 }
 
 // --------------------- LORA ----------------------------------------------------------------------
-void LoraProcess		(void)
+void LoraProcess(void)
 {
-	switch ( Radio -> Process())
-			 {
-	 	 	 case RF_IDLE:
-	 	 		 break;
+	switch (Radio->Process())
+	{
+	case RF_IDLE:
+		break;
 
-			 case RF_BUSY:
-				 break;
+	case RF_BUSY:
+		break;
 
-			 case RF_TX_DONE:
- 	 	 	 	 counterTXDisplay = 0;		// TX больше не рисуем и гасим Красный светодиод
- 	 	 	 	 Radio -> StartRx();		// включение трансивера на прием
+	case RF_TX_DONE:
+		counterTXDisplay = 0; // TX Р±РѕР»СЊС€Рµ РЅРµ СЂРёСЃСѓРµРј Рё РіР°СЃРёРј РљСЂР°СЃРЅС‹Р№ СЃРІРµС‚РѕРґРёРѕРґ
+		Radio->StartRx();	  // РІРєР»СЋС‡РµРЅРёРµ С‚СЂР°РЅСЃРёРІРµСЂР° РЅР° РїСЂРёРµРј
 
-			#ifdef DebugLORAToUART
-				rprintfInit (Terminal); // инициализация printf (). Вывод в терминал
-				printf(" RF_TX_DONE StartRX \n\r");
-			#endif
-				 break;
+#ifdef DebugLORAToUART
+		rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+		printf(" RF_TX_DONE StartRX \n\r");
+#endif
+		break;
 
-			 case RF_RX_TIMEOUT:
-			#ifdef DebugLORAToUART
-				rprintfInit (Terminal); // инициализация printf (). Вывод в терминал
-				printf(" RF_RX_TIMEOUT \n\r");
-			#endif	 
-				 break;
+	case RF_RX_TIMEOUT:
+#ifdef DebugLORAToUART
+		rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+		printf(" RF_RX_TIMEOUT \n\r");
+#endif
+		break;
 
-			 case RF_RX_DONE: //---------------------------------------------------------------- принят пакет -------------------------------------------------------
+	case RF_RX_DONE: //---------------------------------------------------------------- РїСЂРёРЅСЏС‚ РїР°РєРµС‚ -------------------------------------------------------
 
-				// counterRXDisplay = 500;	// рисуем RX 500 мс
-				 countOK ++; // счетчик общего количества пакетов
+		// counterRXDisplay = 500;	// СЂРёСЃСѓРµРј RX 500 РјСЃ
+		countOK++; // СЃС‡РµС‚С‡РёРє РѕР±С‰РµРіРѕ РєРѕР»РёС‡РµСЃС‚РІР° РїР°РєРµС‚РѕРІ
 
+		if (CRCerror == 1) // РѕС€РёР±РєР° CRC
+		{
+			CRCerror = 0; // РѕР±СЂР°Р±РѕС‚Р°Р»Рё РѕС€РёР±РєСѓ, С„Р»Р°Рі СЃР±СЂРѕС€РµРЅ
 
-				 if (CRCerror == 1) // ошибка CRC
+			// OnLED0();				// Р›РѕР¶РЅС‹Р№ РїСЂРёРµРј
+			// counterLed0 = 100; 		// Р·Р°Р¶РёРіР°РµРј СЃРёРЅРёР№ СЃРІРµС‚РѕРґРёРѕРґ РЅР° 100 РјСЃ
+
+#ifdef DebugLORAToUART
+			rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+			printf("\n\r\n\r CRC ER! Noise received ");
+#endif
+			countERR++; // РєРѕР»РёС‡РµСЃС‚РІРѕ Р»РѕР¶РЅС‹С… РїСЂРёРµРјРѕРІ
+		}
+		else // РїР°РєРµС‚ РїСЂРёРЅСЏС‚ Рё РЅРµС‚ РѕС€РёР±РєРё CRC
+		{
+			Radio->GetRxPacket(LORAbufferRX, (u16 *)&BufferSize); // РєРѕРїРёСЂСѓРµРј РґР°РЅРЅС‹Рµ РІ Р±СѓС„РµСЂ РїСЂРёРµРјР° LORAbufferRX
+
+			OnLED0();				// РџСЂРёРЅСЏС‚ РїСЂР°РІРёР»СЊРЅС‹Р№ РїР°РєРµС‚
+			counterLed0 = 500;		// Р·Р°Р¶РёРіР°РµРј СЃРёРЅРёР№ СЃРІРµС‚РѕРґРёРѕРґ РЅР° 500 РјСЃ
+			counterRXDisplay = 500; // СЂРёСЃСѓРµРј RX 500 РјСЃ
+
+			flagRX_OK = 1; // С„Р»Р°Рі РіРѕС‚РѕРІРЅРѕСЃС‚Рё РЅРѕРІС‹С… РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ
+
+			FREQ_ERROR = ((LoraReadReg(0x28) << 28) + (LoraReadReg(0x29) << 20) + (LoraReadReg(0x2A) << 12));
+
+			// FreqError =  ((FREQ_ERROR * (2^24) ) / 32e6 ) * (BW / 500) ; // СЂР°СЃС‡РµС‚ РѕС€РёР±РєРё РїРѕ С‡Р°СЃС‚РѕС‚Рµ
+			FreqError = (FREQ_ERROR / 4096) / 3.815; // Р·РЅР°С‡РµРЅРёРµ РІ Р“С†
+
+#ifdef DebugLORAToUART
+			rprintfInit(Terminal); // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ printf (). Р’С‹РІРѕРґ РІ С‚РµСЂРјРёРЅР°Р»
+			printf("\n\r\n\r RSSI:%d dBm ", (s32)(SX1276LoRaGetPacketRssi()));
+			// printf("\n\r Preamble:  %d\n\r",  SX1276LoRaGetPreambleLength () );
+			// printf(" Gain: %d ", SX1276GetPacketRxGain() );
+			printf(" SNR:%d dB ", SX1276GetPacketSnr());
+
+			// printf(" Preamble: %d ",  SX1276LoRaGetPreambleLength () );
+			// printf(" NbTrigPeaks: %d \n\r",  SX1276LoRaGetNbTrigPeaks () );
+
+			printf(" PER:%02d.%02d%% ", PER1, PER2);
+			printf(" Offset:%d Hz", (s32)FreqError);
+			// printf(" err=%d summ=%d ", countERR, countOK );
+
+			/*            if (CRCerror == 1) // РѕС€РёР±РєР° CRC
 				 {
-					CRCerror = 0;  // обработали ошибку, флаг сброшен
+					 CRCerror = 0;
+					 printf(" CRC ER! " );
 
-					//OnLED0();				// Ложный прием
-					//counterLed0 = 100; 		// зажигаем синий светодиод на 100 мс
+					 countERR ++;
 
-				#ifdef DebugLORAToUART 
-					 rprintfInit (Terminal); // инициализация printf (). Вывод в терминал
-					 printf("\n\r\n\r CRC ER! Noise received " );
-				#endif
-					 countERR ++; // количество ложных приемов
-				 }
-				 else   // пакет принят и нет ошибки CRC
-				 {
-					Radio -> GetRxPacket( LORAbufferRX, (u16*)&BufferSize ); // копируем данные в буфер приема LORAbufferRX
+			//               if (trigger_PER == 0)
+			//                   {
+			//                   countERR = 0;
+			//                   countOK = 0;
+			//                   PER = 0;
+			//                   trigger_PER = 1;
+			//                   }
+				 }*/
 
-					OnLED0();				// Принят правильный пакет
-					counterLed0 = 500; 		// зажигаем синий светодиод на 500 мс
-					counterRXDisplay = 500;	// рисуем RX 500 мс
+			printf("\n\r RX: [\t");
+			for (i = 0; i < 240; i++)
+			{
+				printf("%02x ", LORAbufferRX[i]);
+				if (i == 23 || i == 47 || i == 71 || i == 95 || i == 119 || i == 143 || i == 71 || i == 167 || i == 191 || i == 215) // 10 СЃС‚СЂРѕРє РїРѕ 24 Р±Р°Р№С‚Р°
+				{
+					printf("\n\r\t");
+				}
+			}
+			printf("  ]\r\n");
 
-					flagRX_OK = 1; // флаг готовности новых данных в буфере
+			printf(" Number of payload bytes \t\t0x13: 0x%02X  \n\r", LoraReadReg(0x13));								   // Number of payload bytes of latest packet received
+			printf(" Number of valid headers received \t0x14-15: %d  \n\r", (LoraReadReg(0x14) << 8) + LoraReadReg(0x15)); // Number of valid headers received
+			printf(" Number of valid packets received \t0x16-17: %d  \n\r", (LoraReadReg(0x16) << 8) + LoraReadReg(0x17)); // Number of valid packets received
 
-					FREQ_ERROR =( (LoraReadReg(0x28) << 28) + (LoraReadReg(0x29) << 20) + (LoraReadReg(0x2A) << 12) ) ;
-
-					// FreqError =  ((FREQ_ERROR * (2^24) ) / 32e6 ) * (BW / 500) ; // расчет ошибки по частоте
-					FreqError = (FREQ_ERROR/4096) / 3.815; // значение в Гц
-
-
-				#ifdef DebugLORAToUART
-					 rprintfInit (Terminal); // инициализация printf (). Вывод в терминал
-					 printf("\n\r\n\r RSSI:%d dBm ", (s32)(SX1276LoRaGetPacketRssi()) );
-					// printf("\n\r Preamble:  %d\n\r",  SX1276LoRaGetPreambleLength () );
-					// printf(" Gain: %d ", SX1276GetPacketRxGain() );
-					 printf(" SNR:%d dB ", SX1276GetPacketSnr() );
-
-					// printf(" Preamble: %d ",  SX1276LoRaGetPreambleLength () );
-					// printf(" NbTrigPeaks: %d \n\r",  SX1276LoRaGetNbTrigPeaks () );
-
-					 printf(" PER:%02d.%02d%% ", PER1, PER2 );
-					 printf(" Offset:%d Hz", (s32)FreqError );
-					// printf(" err=%d summ=%d ", countERR, countOK );
-
-				/*            if (CRCerror == 1) // ошибка CRC
-					 {
-						 CRCerror = 0;
-						 printf(" CRC ER! " );
-
-						 countERR ++;
-
-				//               if (trigger_PER == 0)
-				//                   {
-				//                   countERR = 0;
-				//                   countOK = 0;
-				//                   PER = 0;
-				//                   trigger_PER = 1;
-				//                   }
-					 }*/
-
-					printf("\n\r RX: [\t");
-					for (i = 0; i< 240; i++)
-					{
-						 printf("%02x ", LORAbufferRX[i] ) ;
-						if ( i == 23 || i == 47 || i == 71 || i == 95 || i == 119 || i == 143 || i == 71 || i == 167 || i == 191 || i == 215 ) // 10 строк по 24 байта
-						{
-							printf("\n\r\t");
-						}
-					}
-					printf("  ]\r\n");
-
-					printf(" Number of payload bytes \t\t0x13: 0x%02X  \n\r", LoraReadReg(0x13) ); // Number of payload bytes of latest packet received
-					printf(" Number of valid headers received \t0x14-15: %d  \n\r", (LoraReadReg(0x14) << 8) + LoraReadReg(0x15) ); // Number of valid headers received
-					printf(" Number of valid packets received \t0x16-17: %d  \n\r", (LoraReadReg(0x16) << 8) + LoraReadReg(0x17) ); // Number of valid packets received
-
-				#endif
-
-
-				 }
-
+#endif
+		}
 
 		//	 PER = (countERR * 10000 / countOK) ;
 		//	 PER1 = PER / 100;
 		//	 PER2 = PER % 100;
 
-
-
-
-            break;
-			 }
-
+		break;
+	}
 }
 
-// запись в FIFO буфер size байт
-void LoraWriteFIFO (u8 *buffer, u8 size)
+// Р·Р°РїРёСЃСЊ РІ FIFO Р±СѓС„РµСЂ size Р±Р°Р№С‚
+void LoraWriteFIFO(u8 *buffer, u8 size)
 {
-	LoraWriteBuffer (0, buffer, size);
+	LoraWriteBuffer(0, buffer, size);
 }
 
-// чтение из FIFO буфера size байт
-void LoraReadFIFO (u8 *buffer, u8 size)
+// С‡С‚РµРЅРёРµ РёР· FIFO Р±СѓС„РµСЂР° size Р±Р°Р№С‚
+void LoraReadFIFO(u8 *buffer, u8 size)
 {
-	LoraReadBuffer (0, buffer, size);
+	LoraReadBuffer(0, buffer, size);
 }
 
-// BURST запись size регистров сразу начиная с адреса addr
-void LoraWriteBuffer (u8 Addr, u8 *buffer, u8 size)
+// BURST Р·Р°РїРёСЃСЊ size СЂРµРіРёСЃС‚СЂРѕРІ СЃСЂР°Р·Сѓ РЅР°С‡РёРЅР°СЏ СЃ Р°РґСЂРµСЃР° addr
+void LoraWriteBuffer(u8 Addr, u8 *buffer, u8 size)
 {
 	u8 i;
 	OnNssLORA();
 
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET); // ждем пока освободится буфер передачи
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)
+		; // Р¶РґРµРј РїРѕРєР° РѕСЃРІРѕР±РѕРґРёС‚СЃСЏ Р±СѓС„РµСЂ РїРµСЂРµРґР°С‡Рё
 	SPI_I2S_SendData(SPI1, Addr | 0x80);
-	for( i = 0; i < size; i++ )
-		{
-		while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET); // ждем пока освободится буфер передачи
-		SPI_I2S_SendData(SPI1, buffer [i]);
-		}
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);
+	for (i = 0; i < size; i++)
+	{
+		while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)
+			; // Р¶РґРµРј РїРѕРєР° РѕСЃРІРѕР±РѕРґРёС‚СЃСЏ Р±СѓС„РµСЂ РїРµСЂРµРґР°С‡Рё
+		SPI_I2S_SendData(SPI1, buffer[i]);
+	}
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)
+		;
 
 	OffNssLORA();
 }
 
-// BURST чтение size регистров сразу начиная с адреса addr
-void LoraReadBuffer (u8 Addr, u8 *buffer, u8 size)
+// BURST С‡С‚РµРЅРёРµ size СЂРµРіРёСЃС‚СЂРѕРІ СЃСЂР°Р·Сѓ РЅР°С‡РёРЅР°СЏ СЃ Р°РґСЂРµСЃР° addr
+void LoraReadBuffer(u8 Addr, u8 *buffer, u8 size)
 {
 	u8 i;
 	OnNssLORA();
 
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET); 		// ждем пока освободится буфер передачи
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)
+		; // Р¶РґРµРј РїРѕРєР° РѕСЃРІРѕР±РѕРґРёС‚СЃСЏ Р±СѓС„РµСЂ РїРµСЂРµРґР°С‡Рё
 	SPI_I2S_SendData(SPI1, Addr & 0x7F);
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET); 		// ждем пока байт прочитается целиком
-	SPI_I2S_ReceiveData (SPI1); 											// читаем байт для сброса флага чтения
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET)
+		;					   // Р¶РґРµРј РїРѕРєР° Р±Р°Р№С‚ РїСЂРѕС‡РёС‚Р°РµС‚СЃСЏ С†РµР»РёРєРѕРј
+	SPI_I2S_ReceiveData(SPI1); // С‡РёС‚Р°РµРј Р±Р°Р№С‚ РґР»СЏ СЃР±СЂРѕСЃР° С„Р»Р°РіР° С‡С‚РµРЅРёСЏ
 
-	for( i = 0; i < size; i++ )
-		{
-		while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET); 	// ждем пока освободится буфер передачи
+	for (i = 0; i < size; i++)
+	{
+		while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)
+			; // Р¶РґРµРј РїРѕРєР° РѕСЃРІРѕР±РѕРґРёС‚СЃСЏ Р±СѓС„РµСЂ РїРµСЂРµРґР°С‡Рё
 		SPI_I2S_SendData(SPI1, 0x00);
-		while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET); 	// ждем пока байт прочитается целиком
-		buffer [i] = SPI_I2S_ReceiveData (SPI1);
-		}
+		while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET)
+			; // Р¶РґРµРј РїРѕРєР° Р±Р°Р№С‚ РїСЂРѕС‡РёС‚Р°РµС‚СЃСЏ С†РµР»РёРєРѕРј
+		buffer[i] = SPI_I2S_ReceiveData(SPI1);
+	}
 
 	OffNssLORA();
 }
 
-// запись регистра
-void LoraWriteReg	(u8 Addr, u8 Reg)
+// Р·Р°РїРёСЃСЊ СЂРµРіРёСЃС‚СЂР°
+void LoraWriteReg(u8 Addr, u8 Reg)
 {
 	OnNssLORA();
 
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET); // ждем пока освободится буфер передачи
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)
+		; // Р¶РґРµРј РїРѕРєР° РѕСЃРІРѕР±РѕРґРёС‚СЃСЏ Р±СѓС„РµСЂ РїРµСЂРµРґР°С‡Рё
 	SPI_I2S_SendData(SPI1, Addr | 0x80);
-	while(SPI_I2S_GetFlagStatus(SPI1,SPI_I2S_FLAG_BSY) == SET); 	// todo переделать правильно!
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)
+		; // todo РїРµСЂРµРґРµР»Р°С‚СЊ РїСЂР°РІРёР»СЊРЅРѕ!
 	SPI_I2S_SendData(SPI1, Reg);
-	while(SPI_I2S_GetFlagStatus(SPI1,SPI_I2S_FLAG_BSY) == SET);
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)
+		;
 
 	OffNssLORA();
 }
-// чтение регистра
-u8   LoraReadReg	(u8 Addr)
+// С‡С‚РµРЅРёРµ СЂРµРіРёСЃС‚СЂР°
+u8 LoraReadReg(u8 Addr)
 {
 	OnNssLORA();
 
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET); // ждем пока освободится буфер передачи
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)
+		; // Р¶РґРµРј РїРѕРєР° РѕСЃРІРѕР±РѕРґРёС‚СЃСЏ Р±СѓС„РµСЂ РїРµСЂРµРґР°С‡Рё
 	SPI_I2S_SendData(SPI1, Addr);
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);  	// todo переделать правильно!
-	SPI_I2S_ReceiveData (SPI1);										// для очистки флага SPI_I2S_FLAG_RXNE
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET)
+		;					   // todo РїРµСЂРµРґРµР»Р°С‚СЊ РїСЂР°РІРёР»СЊРЅРѕ!
+	SPI_I2S_ReceiveData(SPI1); // РґР»СЏ РѕС‡РёСЃС‚РєРё С„Р»Р°РіР° SPI_I2S_FLAG_RXNE
 	SPI_I2S_SendData(SPI1, 0x00);
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET); // ждем пока байт прочитается целиком
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET)
+		; // Р¶РґРµРј РїРѕРєР° Р±Р°Р№С‚ РїСЂРѕС‡РёС‚Р°РµС‚СЃСЏ С†РµР»РёРєРѕРј
 
 	OffNssLORA();
-	return (SPI_I2S_ReceiveData (SPI1));
+	return (SPI_I2S_ReceiveData(SPI1));
 }
 
 /**
-  * @brief  Gets numeric values from the hyperterminal.
-  */
-u8 	 USART_Scanf(u32 value)
+ * @brief  Gets numeric values from the hyperterminal.
+ */
+u8 USART_Scanf(u32 value)
 {
-    u32 index = 0;
-    u32 tmp[2] = {0, 0};
+	u32 index = 0;
+	u32 tmp[2] = {0, 0};
 
-    while (index < 2)  // ждем ввода двух байт (цифр) из терминала в USART1 .
-    {
-        /* Loop until RXNE = 1 */
-        while (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET)
-        {}
-        tmp[index++] = (USART_ReceiveData(USART1));
-        if ((tmp[index - 1] < 0x30) || (tmp[index - 1] > 0x39))
-        {
-            printf("\n\rPlease enter valid number between 0 and 9");
-            index--;
-        }
-    }
-    /* Calculate the Corresponding value */
-    index = (tmp[1] - 0x30) + ((tmp[0] - 0x30) * 10);
-    /* Checks */
-    if (index > value) // число должно быть не более value
-    {
-        printf("\n\rPlease enter valid number between 0 and %d", value);
-        return 0xFF;
-    }
-    return index;
+	while (index < 2) // Р¶РґРµРј РІРІРѕРґР° РґРІСѓС… Р±Р°Р№С‚ (С†РёС„СЂ) РёР· С‚РµСЂРјРёРЅР°Р»Р° РІ USART1 .
+	{
+		/* Loop until RXNE = 1 */
+		while (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET)
+		{
+		}
+		tmp[index++] = (USART_ReceiveData(USART1));
+		if ((tmp[index - 1] < 0x30) || (tmp[index - 1] > 0x39))
+		{
+			printf("\n\rPlease enter valid number between 0 and 9");
+			index--;
+		}
+	}
+	/* Calculate the Corresponding value */
+	index = (tmp[1] - 0x30) + ((tmp[0] - 0x30) * 10);
+	/* Checks */
+	if (index > value) // С‡РёСЃР»Рѕ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РЅРµ Р±РѕР»РµРµ value
+	{
+		printf("\n\rPlease enter valid number between 0 and %d", value);
+		return 0xFF;
+	}
+	return index;
 }
 
 ///////////////////////////////
-void USART3_SendByte 		(char byte)
+void USART3_SendByte(char byte)
 {
 	USART_SendByte(USART3, byte);
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void USART2_SendByte 		(char byte)
+void USART2_SendByte(char byte)
 {
 	USART_SendByte(USART2, byte);
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void USART1_SendByte 		(char byte)
+void USART1_SendByte(char byte)
 {
 	USART_SendByte(USART1, byte);
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void USART_SendByte (USART_TypeDef* USARTx, u16 Data)
+void USART_SendByte(USART_TypeDef *USARTx, u16 Data)
 {
-	while (USART_GetFlagStatus(USARTx, USART_FLAG_TXE) == RESET);// ждем пока освободится буфер передачи
-	USART_SendData ( USARTx, Data); //
+	while (USART_GetFlagStatus(USARTx, USART_FLAG_TXE) == RESET)
+		;						  // Р¶РґРµРј РїРѕРєР° РѕСЃРІРѕР±РѕРґРёС‚СЃСЏ Р±СѓС„РµСЂ РїРµСЂРµРґР°С‡Рё
+	USART_SendData(USARTx, Data); //
 }
-////////////// очистка приемного буфера GPS ///////////////////////////////////////////////////////////////////////
-void ClearGPSBuffer			(void)
+////////////// РѕС‡РёСЃС‚РєР° РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР° GPS ///////////////////////////////////////////////////////////////////////
+void ClearGPSBuffer(void)
 {
-	for (i=0; i<GPSBUFLENGTH; i++) 	// очистка буфера
-		{
-		GPSBuf[i] = '\0'; 			// заполняем нулями
-		}
-	GPSBufWrPoint = 0; 				// сброс в 0, записываем следующую посылку с начала буфера
+	for (i = 0; i < GPSBUFLENGTH; i++) // РѕС‡РёСЃС‚РєР° Р±СѓС„РµСЂР°
+	{
+		GPSBuf[i] = '\0'; // Р·Р°РїРѕР»РЅСЏРµРј РЅСѓР»СЏРјРё
+	}
+	GPSBufWrPoint = 0; // СЃР±СЂРѕСЃ РІ 0, Р·Р°РїРёСЃС‹РІР°РµРј СЃР»РµРґСѓСЋС‰СѓСЋ РїРѕСЃС‹Р»РєСѓ СЃ РЅР°С‡Р°Р»Р° Р±СѓС„РµСЂР°
 }
-////////////// очистка приемного буфера BLE ///////////////////////////////////////////////////////////////////////
-void ClearBLEBuffer			(void)
+////////////// РѕС‡РёСЃС‚РєР° РїСЂРёРµРјРЅРѕРіРѕ Р±СѓС„РµСЂР° BLE ///////////////////////////////////////////////////////////////////////
+void ClearBLEBuffer(void)
 {
-	for (i=0; i<BufferUSART2Size; i++) 	// очистка буфера
-		{
-		BufferUSART2RX[i] = '\0'; 			// заполняем нулями
-		}
-	counterUSART2Buffer = 0; 				// сброс в 0, записываем следующую посылку с начала буфера
+	for (i = 0; i < BufferUSART2Size; i++) // РѕС‡РёСЃС‚РєР° Р±СѓС„РµСЂР°
+	{
+		BufferUSART2RX[i] = '\0'; // Р·Р°РїРѕР»РЅСЏРµРј РЅСѓР»СЏРјРё
+	}
+	counterUSART2Buffer = 0; // СЃР±СЂРѕСЃ РІ 0, Р·Р°РїРёСЃС‹РІР°РµРј СЃР»РµРґСѓСЋС‰СѓСЋ РїРѕСЃС‹Р»РєСѓ СЃ РЅР°С‡Р°Р»Р° Р±СѓС„РµСЂР°
 }
 
 /**
-  * @brief  Displays the current time.
-  * @param  TimeVar: RTC counter value.
-  * @retval None
-  */
+ * @brief  Displays the current time.
+ * @param  TimeVar: RTC counter value.
+ * @retval None
+ */
 void Time_Display(u32 TimeVar)
 {
-    u32 THH = 0, TMM = 0, TSS = 0;
+	u32 THH = 0, TMM = 0, TSS = 0;
 
-    /* Compute  hours */
-    THH = TimeVar / 3600 % 24;
-    /* Compute minutes */
-    TMM = (TimeVar % 3600) / 60;
-    /* Compute seconds */
-    TSS = (TimeVar % 3600) % 60;
+	/* Compute  hours */
+	THH = TimeVar / 3600 % 24;
+	/* Compute minutes */
+	TMM = (TimeVar % 3600) / 60;
+	/* Compute seconds */
+	TSS = (TimeVar % 3600) % 60;
 
-    printf("%02d:%02d:%02d", THH, TMM, TSS);
+	printf("%02d:%02d:%02d", THH, TMM, TSS);
 }
 void Time_Display2(u32 TimeVar)
 {
-    u32 THH = 0, TMM = 0, TSS = 0;
+	u32 THH = 0, TMM = 0, TSS = 0;
 
-    /* Compute  hours */
-    THH = TimeVar / 3600 % 24;
-    /* Compute minutes */
-    TMM = (TimeVar % 3600) / 60;
-    /* Compute seconds */
-    //TSS = (TimeVar % 3600) % 60;
+	/* Compute  hours */
+	THH = TimeVar / 3600 % 24;
+	/* Compute minutes */
+	TMM = (TimeVar % 3600) / 60;
+	/* Compute seconds */
+	// TSS = (TimeVar % 3600) % 60;
 
-    printf("%02d:%02d", THH, TMM );
+	printf("%02d:%02d", THH, TMM);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void OnVcc1 	(void) // Включить питание
+void OnVcc1(void) // Р’РєР»СЋС‡РёС‚СЊ РїРёС‚Р°РЅРёРµ
 {
-	  GPIO_InitTypeDef        GPIO_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStructure;
 
-	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 ; //     Vcc1ON   ВЫХОД
-	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	  GPIO_Init(GPIOB, &GPIO_InitStructure);
-	  GPIO_SetBits(GPIOB, GPIO_Pin_13);  // на выходе 1
-}
-void OffVcc1 	(void) // Выключить питание
-{
-	  GPIO_InitTypeDef        GPIO_InitStructure;
-
-	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 ; //     Vcc1ON   вход, третье состояние
-	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	  GPIO_Init(GPIOB, &GPIO_InitStructure);
-	  GPIO_ResetBits(GPIOB, GPIO_Pin_13);
-}
-
-void NRESET_on	(void) // 1
-{ GPIO_SetBits(GPIOB, GPIO_Pin_2); }
-void NRESET_off	(void) // 0
-{ GPIO_ResetBits(GPIOB, GPIO_Pin_2); }
-
-void OnLED0 	(void) // Включить светодиод LED0  ------ СИНИЙ
-{ GPIO_SetBits(GPIOA, GPIO_Pin_11); } // LED0 ВКЛ
-void OffLED0 	(void) // Включить светодиод LED0
-{ GPIO_ResetBits(GPIOA, GPIO_Pin_11); } // LED0 ВКЛ
-void CplLED0	(void) // переключить светодиод
-{	GPIOA->ODR ^= GPIO_Pin_11; }
-
-void OnLED1 	(void) // Включить светодиод LED1  -------- КРАСНЫЙ ---
-{ GPIO_SetBits(GPIOA, GPIO_Pin_12); } // LED0 ВКЛ
-void OffLED1 	(void) // Включить светодиод LED1
-{ GPIO_ResetBits(GPIOA, GPIO_Pin_12); } // LED1 ВКЛ
-void CplLED1	(void) // переключить светодиод
-{	GPIOA->ODR ^= GPIO_Pin_12; }
-
-void OnTest 	(void) // Test = 1	он же КРАСНЫЙ светодиод
-{ GPIO_SetBits(GPIOA, GPIO_Pin_12); } //
-void OffTest 	(void) // Test = 0
-{ GPIO_ResetBits(GPIOA, GPIO_Pin_12); } //
-void CplTest	(void)	// Переключить Test
-{ GPIOA->ODR ^= GPIO_Pin_12; }
-
-void OnResetLORA (void) //  = 0
-{ GPIO_ResetBits(GPIOB, GPIO_Pin_4); } //
-void OffResetLORA(void) //  = 1
-{ GPIO_SetBits(GPIOB, GPIO_Pin_4); } //
-
-void OnNssLORA 	(void) //  = 0
-{ GPIO_ResetBits(GPIOA, GPIO_Pin_4); } //
-void OffNssLORA	(void) //  = 1
-{ GPIO_SetBits(GPIOA, GPIO_Pin_4); } //
-
-void OnResetBLE (void) //  = 1
-{ GPIO_ResetBits(GPIOB, GPIO_Pin_4); } //
-void OffResetBLE(void) //  = 0
-{ GPIO_SetBits(GPIOB, GPIO_Pin_4); } //
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void OnDivGND1 	(void) // Подключить делитель напряжения к земле
-{
-	  GPIO_InitTypeDef        GPIO_InitStructure;
-
-	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15 ; 	//   ВЫХОД
-	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	  GPIO_Init(GPIOB, &GPIO_InitStructure);
-	  GPIO_ResetBits(GPIOB, GPIO_Pin_15);  			// на выходе 0
-}
-void OffDivGND1	(void) // Выключить делитель
-{
-	  GPIO_InitTypeDef        GPIO_InitStructure;
-
-	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15 ; 	 //  вход, третье состояние
-	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	  GPIO_Init(GPIOB, &GPIO_InitStructure);
-	  GPIO_SetBits(GPIOB, GPIO_Pin_15);
-}
-void OnDivGND2 	(void) // Подключить делитель напряжения к земле
-{
-	  GPIO_InitTypeDef        GPIO_InitStructure;
-
-	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14 ; 	//   ВЫХОД
-	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	  GPIO_Init(GPIOB, &GPIO_InitStructure);
-	  GPIO_ResetBits(GPIOB, GPIO_Pin_14);  			// на выходе 0
-}
-void OffDivGND2	(void) // Выключить делитель
-{
-	  GPIO_InitTypeDef        GPIO_InitStructure;
-
-	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14 ; 	 //    вход, третье состояние
-	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	  GPIO_Init(GPIOB, &GPIO_InitStructure);
-	  GPIO_SetBits(GPIOB, GPIO_Pin_14);
-}
-
-
-// блокирующая задержка в мс на SysTick
-void DelayMS				( u16 delay)
-{
-    timer1ms = 0;
-    while (timer1ms < delay) {} // ждем delay мс
-}
-
-// для таймаутов Lora
-u32  GET_TICK_COUNT ( void )
-{
-	return ( timer1ms );
-}
-
-/* --------------- Настрока портов контроллера ---------------------------
- *
- */
-void PortIO_Configuration 	(void) // настройка портов
-{
-	GPIO_InitTypeDef        GPIO_InitStructure;
-
-  /* Disable the Serial Wire Jtag Debug Port SWJ-DP */
- // GPIO_PinRemapConfig(GPIO_Remap_SWJ_Disable, ENABLE);  // не отключаем JTAG
- //  PA.13 (JTMS/SWDAT), PA.14 (JTCK/SWCLK) and PA.15 (JTDI)
-
-//  ВРЕМЕННО test pin на PA12 на USB интерфейсе todo
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12 ; 			// Выход
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-  GPIO_ResetBits(GPIOA, GPIO_Pin_12);
-//  ВРЕМЕННО синий светодиод на PA11 на USB интерфейсе  todo
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11 ; 			// Выход
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-  GPIO_ResetBits(GPIOA, GPIO_Pin_11);
-
-// настройка портов. Вход сигнала USB_ON
-//  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3 ; 			// вход сигнала USB_ON
-//  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; 		// todo заменить, пересекается с JTAG
-//  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-//  GPIO_Init(GPIOB, &GPIO_InitStructure);
-// настройка портов. Вход сигнала STAT от микросхемы заряда аккумулятора
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 ; 			// вход сигнала STAT
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; 		// низкий уровень - идет заряд
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-// настройка портов. Вход сигнала 1PPS  PB12
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12 ; 			// вход сигнала Timemark
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; 		//
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-// настройка портов. Вход кнопки SOS  PA15
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15 ; 			// Кнопка SOS вход, подтяжка вверх
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; 		//
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-// настройка портов.Кнопка питания PB8
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 ; 			// Кнопка выкл/экран   вход, подтяжка вверх
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; 		// выключение питания длительным удержанием кнопки, переключение экранов - коротким
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-// Входы АЦП для измерения напряжения аккумулятора и батарейки  PA0 и PA1
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 ;   // Аналоговый вход
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-// настройка портов. Управление делителями напряжения для АЦП
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14 | GPIO_Pin_15 ; // вход, третье состояние
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING; 	// выключение делителя третьим состоянием, включение - выход в 0
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-// настройка портов. Управление питанием, включение-выключение стабилизаторов
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 ; 				// Vcc1ON   вход, третье состояние
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING; 	// выключение питания третьим состоянием, включение - выход в 1
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-  GPIO_ResetBits(GPIOB, GPIO_Pin_13);
-
-// ------------------ HM10 BLE модуль на CC2540 --- подключен к USART2 -------------------
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 ; 				// BRESET   выход
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-  GPIO_ResetBits(GPIOB, GPIO_Pin_4); 						// СБРОС
-
-
-//------------------- SIM33ELA----------------- подключен к USART3 ------------
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 ; 				// NRESET   выход
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-  GPIO_ResetBits(GPIOB, GPIO_Pin_2); 						// СБРОС
-
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12 ; 				// TIMEMARK вход. Генерирует прерывание
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-  GPIO_ResetBits(GPIOB, GPIO_Pin_12);
-
-//	------------- LORA модуль ----------------------------------
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 ; 				// RESET
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13; //     Vcc1ON   Р’Р«РҐРћР”
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
-	GPIO_ResetBits(GPIOB, GPIO_Pin_0); 						// RESET в 0 - модуль в сбросе
+	GPIO_SetBits(GPIOB, GPIO_Pin_13); // РЅР° РІС‹С…РѕРґРµ 1
+}
+void OffVcc1(void) // Р’С‹РєР»СЋС‡РёС‚СЊ РїРёС‚Р°РЅРёРµ
+{
+	GPIO_InitTypeDef GPIO_InitStructure;
 
-// -------------настройка SPI1 --------------------------------
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5  | GPIO_Pin_7; // SCK и MOSI
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13; //     Vcc1ON   РІС…РѕРґ, С‚СЂРµС‚СЊРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOB, GPIO_Pin_13);
+}
+
+void NRESET_on(void) // 1
+{
+	GPIO_SetBits(GPIOB, GPIO_Pin_2);
+}
+void NRESET_off(void) // 0
+{
+	GPIO_ResetBits(GPIOB, GPIO_Pin_2);
+}
+
+void OnLED0(void) // Р’РєР»СЋС‡РёС‚СЊ СЃРІРµС‚РѕРґРёРѕРґ LED0  ------ РЎРРќРР™
+{
+	GPIO_SetBits(GPIOA, GPIO_Pin_11);
+} // LED0 Р’РљР›
+void OffLED0(void) // Р’РєР»СЋС‡РёС‚СЊ СЃРІРµС‚РѕРґРёРѕРґ LED0
+{
+	GPIO_ResetBits(GPIOA, GPIO_Pin_11);
+} // LED0 Р’РљР›
+void CplLED0(void) // РїРµСЂРµРєР»СЋС‡РёС‚СЊ СЃРІРµС‚РѕРґРёРѕРґ
+{
+	GPIOA->ODR ^= GPIO_Pin_11;
+}
+
+void OnLED1(void) // Р’РєР»СЋС‡РёС‚СЊ СЃРІРµС‚РѕРґРёРѕРґ LED1  -------- РљР РђРЎРќР«Р™ ---
+{
+	GPIO_SetBits(GPIOA, GPIO_Pin_12);
+} // LED0 Р’РљР›
+void OffLED1(void) // Р’РєР»СЋС‡РёС‚СЊ СЃРІРµС‚РѕРґРёРѕРґ LED1
+{
+	GPIO_ResetBits(GPIOA, GPIO_Pin_12);
+} // LED1 Р’РљР›
+void CplLED1(void) // РїРµСЂРµРєР»СЋС‡РёС‚СЊ СЃРІРµС‚РѕРґРёРѕРґ
+{
+	GPIOA->ODR ^= GPIO_Pin_12;
+}
+
+void OnTest(void) // Test = 1	РѕРЅ Р¶Рµ РљР РђРЎРќР«Р™ СЃРІРµС‚РѕРґРёРѕРґ
+{
+	GPIO_SetBits(GPIOA, GPIO_Pin_12);
+} //
+void OffTest(void) // Test = 0
+{
+	GPIO_ResetBits(GPIOA, GPIO_Pin_12);
+} //
+void CplTest(void) // РџРµСЂРµРєР»СЋС‡РёС‚СЊ Test
+{
+	GPIOA->ODR ^= GPIO_Pin_12;
+}
+
+void OnResetLORA(void) //  = 0
+{
+	GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+} //
+void OffResetLORA(void) //  = 1
+{
+	GPIO_SetBits(GPIOB, GPIO_Pin_4);
+} //
+
+void OnNssLORA(void) //  = 0
+{
+	GPIO_ResetBits(GPIOA, GPIO_Pin_4);
+} //
+void OffNssLORA(void) //  = 1
+{
+	GPIO_SetBits(GPIOA, GPIO_Pin_4);
+} //
+
+void OnResetBLE(void) //  = 1
+{
+	GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+} //
+void OffResetBLE(void) //  = 0
+{
+	GPIO_SetBits(GPIOB, GPIO_Pin_4);
+} //
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void OnDivGND1(void) // РџРѕРґРєР»СЋС‡РёС‚СЊ РґРµР»РёС‚РµР»СЊ РЅР°РїСЂСЏР¶РµРЅРёСЏ Рє Р·РµРјР»Рµ
+{
+	GPIO_InitTypeDef GPIO_InitStructure;
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15; //   Р’Р«РҐРћР”
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOB, GPIO_Pin_15); // РЅР° РІС‹С…РѕРґРµ 0
+}
+void OffDivGND1(void) // Р’С‹РєР»СЋС‡РёС‚СЊ РґРµР»РёС‚РµР»СЊ
+{
+	GPIO_InitTypeDef GPIO_InitStructure;
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15; //  РІС…РѕРґ, С‚СЂРµС‚СЊРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_SetBits(GPIOB, GPIO_Pin_15);
+}
+void OnDivGND2(void) // РџРѕРґРєР»СЋС‡РёС‚СЊ РґРµР»РёС‚РµР»СЊ РЅР°РїСЂСЏР¶РµРЅРёСЏ Рє Р·РµРјР»Рµ
+{
+	GPIO_InitTypeDef GPIO_InitStructure;
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14; //   Р’Р«РҐРћР”
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOB, GPIO_Pin_14); // РЅР° РІС‹С…РѕРґРµ 0
+}
+void OffDivGND2(void) // Р’С‹РєР»СЋС‡РёС‚СЊ РґРµР»РёС‚РµР»СЊ
+{
+	GPIO_InitTypeDef GPIO_InitStructure;
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14; //    РІС…РѕРґ, С‚СЂРµС‚СЊРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_SetBits(GPIOB, GPIO_Pin_14);
+}
+
+// Р±Р»РѕРєРёСЂСѓСЋС‰Р°СЏ Р·Р°РґРµСЂР¶РєР° РІ РјСЃ РЅР° SysTick
+void DelayMS(u16 delay)
+{
+	timer1ms = 0;
+	while (timer1ms < delay)
+	{
+	} // Р¶РґРµРј delay РјСЃ
+}
+
+// РґР»СЏ С‚Р°Р№РјР°СѓС‚РѕРІ Lora
+u32 GET_TICK_COUNT(void)
+{
+	return (timer1ms);
+}
+
+/* --------------- РќР°СЃС‚СЂРѕРєР° РїРѕСЂС‚РѕРІ РєРѕРЅС‚СЂРѕР»Р»РµСЂР° ---------------------------
+ *
+ */
+void PortIO_Configuration(void) // РЅР°СЃС‚СЂРѕР№РєР° РїРѕСЂС‚РѕРІ
+{
+	GPIO_InitTypeDef GPIO_InitStructure;
+
+	/* Disable the Serial Wire Jtag Debug Port SWJ-DP */
+	// GPIO_PinRemapConfig(GPIO_Remap_SWJ_Disable, ENABLE);  // РЅРµ РѕС‚РєР»СЋС‡Р°РµРј JTAG
+	//  PA.13 (JTMS/SWDAT), PA.14 (JTCK/SWCLK) and PA.15 (JTDI)
+
+	//  Р’Р Р•РњР•РќРќРћ test pin РЅР° PA12 РЅР° USB РёРЅС‚РµСЂС„РµР№СЃРµ todo
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12; // Р’С‹С…РѕРґ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOA, GPIO_Pin_12);
+	//  Р’Р Р•РњР•РќРќРћ СЃРёРЅРёР№ СЃРІРµС‚РѕРґРёРѕРґ РЅР° PA11 РЅР° USB РёРЅС‚РµСЂС„РµР№СЃРµ  todo
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11; // Р’С‹С…РѕРґ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOA, GPIO_Pin_11);
+
+	// РЅР°СЃС‚СЂРѕР№РєР° РїРѕСЂС‚РѕРІ. Р’С…РѕРґ СЃРёРіРЅР°Р»Р° USB_ON
+	//  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3 ; 			// РІС…РѕРґ СЃРёРіРЅР°Р»Р° USB_ON
+	//  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; 		// todo Р·Р°РјРµРЅРёС‚СЊ, РїРµСЂРµСЃРµРєР°РµС‚СЃСЏ СЃ JTAG
+	//  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	//  GPIO_Init(GPIOB, &GPIO_InitStructure);
+	// РЅР°СЃС‚СЂРѕР№РєР° РїРѕСЂС‚РѕРІ. Р’С…РѕРґ СЃРёРіРЅР°Р»Р° STAT РѕС‚ РјРёРєСЂРѕСЃС…РµРјС‹ Р·Р°СЂСЏРґР° Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;	  // РІС…РѕРґ СЃРёРіРЅР°Р»Р° STAT
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; // РЅРёР·РєРёР№ СѓСЂРѕРІРµРЅСЊ - РёРґРµС‚ Р·Р°СЂСЏРґ
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	// РЅР°СЃС‚СЂРѕР№РєР° РїРѕСЂС‚РѕРІ. Р’С…РѕРґ СЃРёРіРЅР°Р»Р° 1PPS  PB12
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;	  // РІС…РѕРґ СЃРёРіРЅР°Р»Р° Timemark
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; //
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	// РЅР°СЃС‚СЂРѕР№РєР° РїРѕСЂС‚РѕРІ. Р’С…РѕРґ РєРЅРѕРїРєРё SOS  PA15
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;	  // РљРЅРѕРїРєР° SOS РІС…РѕРґ, РїРѕРґС‚СЏР¶РєР° РІРІРµСЂС…
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; //
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	// РЅР°СЃС‚СЂРѕР№РєР° РїРѕСЂС‚РѕРІ.РљРЅРѕРїРєР° РїРёС‚Р°РЅРёСЏ PB8
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;	  // РљРЅРѕРїРєР° РІС‹РєР»/СЌРєСЂР°РЅ   РІС…РѕРґ, РїРѕРґС‚СЏР¶РєР° РІРІРµСЂС…
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; // РІС‹РєР»СЋС‡РµРЅРёРµ РїРёС‚Р°РЅРёСЏ РґР»РёС‚РµР»СЊРЅС‹Рј СѓРґРµСЂР¶Р°РЅРёРµРј РєРЅРѕРїРєРё, РїРµСЂРµРєР»СЋС‡РµРЅРёРµ СЌРєСЂР°РЅРѕРІ - РєРѕСЂРѕС‚РєРёРј
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	// Р’С…РѕРґС‹ РђР¦Рџ РґР»СЏ РёР·РјРµСЂРµРЅРёСЏ РЅР°РїСЂСЏР¶РµРЅРёСЏ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° Рё Р±Р°С‚Р°СЂРµР№РєРё  PA0 Рё PA1
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1; // РђРЅР°Р»РѕРіРѕРІС‹Р№ РІС…РѕРґ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	// РЅР°СЃС‚СЂРѕР№РєР° РїРѕСЂС‚РѕРІ. РЈРїСЂР°РІР»РµРЅРёРµ РґРµР»РёС‚РµР»СЏРјРё РЅР°РїСЂСЏР¶РµРЅРёСЏ РґР»СЏ РђР¦Рџ
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14 | GPIO_Pin_15; // РІС…РѕРґ, С‚СЂРµС‚СЊРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;	 // РІС‹РєР»СЋС‡РµРЅРёРµ РґРµР»РёС‚РµР»СЏ С‚СЂРµС‚СЊРёРј СЃРѕСЃС‚РѕСЏРЅРёРµРј, РІРєР»СЋС‡РµРЅРёРµ - РІС‹С…РѕРґ РІ 0
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	// РЅР°СЃС‚СЂРѕР№РєР° РїРѕСЂС‚РѕРІ. РЈРїСЂР°РІР»РµРЅРёРµ РїРёС‚Р°РЅРёРµРј, РІРєР»СЋС‡РµРЅРёРµ-РІС‹РєР»СЋС‡РµРЅРёРµ СЃС‚Р°Р±РёР»РёР·Р°С‚РѕСЂРѕРІ
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;			  // Vcc1ON   РІС…РѕРґ, С‚СЂРµС‚СЊРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING; // РІС‹РєР»СЋС‡РµРЅРёРµ РїРёС‚Р°РЅРёСЏ С‚СЂРµС‚СЊРёРј СЃРѕСЃС‚РѕСЏРЅРёРµРј, РІРєР»СЋС‡РµРЅРёРµ - РІС‹С…РѕРґ РІ 1
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOB, GPIO_Pin_13);
+
+	// ------------------ HM10 BLE РјРѕРґСѓР»СЊ РЅР° CC2540 --- РїРѕРґРєР»СЋС‡РµРЅ Рє USART2 -------------------
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4; // BRESET   РІС‹С…РѕРґ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOB, GPIO_Pin_4); // РЎР‘Р РћРЎ
+
+	//------------------- SIM33ELA----------------- РїРѕРґРєР»СЋС‡РµРЅ Рє USART3 ------------
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2; // NRESET   РІС‹С…РѕРґ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOB, GPIO_Pin_2); // РЎР‘Р РћРЎ
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12; // TIMEMARK РІС…РѕРґ. Р“РµРЅРµСЂРёСЂСѓРµС‚ РїСЂРµСЂС‹РІР°РЅРёРµ
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOB, GPIO_Pin_12);
+
+	//	------------- LORA РјРѕРґСѓР»СЊ ----------------------------------
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0; // RESET
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_ResetBits(GPIOB, GPIO_Pin_0); // RESET РІ 0 - РјРѕРґСѓР»СЊ РІ СЃР±СЂРѕСЃРµ
+
+	// -------------РЅР°СЃС‚СЂРѕР№РєР° SPI1 --------------------------------
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5 | GPIO_Pin_7; // SCK Рё MOSI
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOA,&GPIO_InitStructure);
-	//GPIO_SetBits(GPIOB, GPIO_Pin_5); // не работает в alternate function push-pull
-	//GPIO_SetBits(GPIOB, GPIO_Pin_7);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6; 				// MISO
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; 			// вход с подтяжкой вверх
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	// GPIO_SetBits(GPIOB, GPIO_Pin_5); // РЅРµ СЂР°Р±РѕС‚Р°РµС‚ РІ alternate function push-pull
+	// GPIO_SetBits(GPIOB, GPIO_Pin_7);
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;	  // MISO
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; // РІС…РѕРґ СЃ РїРѕРґС‚СЏР¶РєРѕР№ РІРІРµСЂС…
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOB,&GPIO_InitStructure);
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 ; 				// NSS, программный сигнал CS для SIM33ELA
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4; // NSS, РїСЂРѕРіСЂР°РјРјРЅС‹Р№ СЃРёРіРЅР°Р» CS РґР»СЏ SIM33ELA
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 	GPIO_SetBits(GPIOA, GPIO_Pin_4);
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5 ; 				// DIO0 вход с подтяжкой вниз
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5; // DIO0 РІС…РѕРґ СЃ РїРѕРґС‚СЏР¶РєРѕР№ РІРЅРёР·
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 ; 				// DIO5 вход с подтяжкой вниз
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1; // DIO5 РІС…РѕРґ СЃ РїРѕРґС‚СЏР¶РєРѕР№ РІРЅРёР·
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-// ----------------- USART1 ----------------------------------------------------
+	// ----------------- USART1 ----------------------------------------------------
 	/* Configure USART1 Rx (PA10) as input floating                         */
-	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_10;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 	/* Configure USART1 Tx (PA9) as alternate function push-pull            */
-	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-// ----------------- USART2 ----------------------------------------------------
+	// ----------------- USART2 ----------------------------------------------------
 	/* Configure USART2 Rx (PA3) as input floating                         */
-	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_3;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 	/* Configure USART2 Tx (PA2) as alternate function push-pull            */
-	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_2;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-// ----------------- USART3 ----------------------------------------------------
+	// ----------------- USART3 ----------------------------------------------------
 	/* Configure USART3 Rx (PB11) as input floating                         */
-	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_11;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 	/* Configure USART3 Tx (PB10) as alternate function push-pull            */
-	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_10;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
-
 }
 
 /*******************************************************************************
-* Function Name  : RCC_Configuration
-* Description    : Configures the different system clocks.
-*******************************************************************************/
-void RCC_Configuration 		(void)
+ * Function Name  : RCC_Configuration
+ * Description    : Configures the different system clocks.
+ *******************************************************************************/
+void RCC_Configuration(void)
 {
-  /* RCC system reset(for debug purpose) */
-  RCC_DeInit();
+	/* RCC system reset(for debug purpose) */
+	RCC_DeInit();
 
-  /* Enable HSE */
-  RCC_HSEConfig(RCC_HSE_ON);
+	/* Enable HSE */
+	RCC_HSEConfig(RCC_HSE_ON);
 
-  /* Wait till HSE is ready */
-  HSEStartUpStatus = RCC_WaitForHSEStartUp();
+	/* Wait till HSE is ready */
+	HSEStartUpStatus = RCC_WaitForHSEStartUp();
 
-  if(HSEStartUpStatus == SUCCESS)
-  {
-    /* Enable Prefetch Buffer */
-    FLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);
+	if (HSEStartUpStatus == SUCCESS)
+	{
+		/* Enable Prefetch Buffer */
+		FLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);
 
-    /* Flash 2 wait state */
-    FLASH_SetLatency(FLASH_Latency_2);
+		/* Flash 2 wait state */
+		FLASH_SetLatency(FLASH_Latency_2);
 
-    /* HCLK = SYSCLK */
-    RCC_HCLKConfig(RCC_SYSCLK_Div1);
+		/* HCLK = SYSCLK */
+		RCC_HCLKConfig(RCC_SYSCLK_Div1);
 
-    /* PCLK2 = HCLK */
-    RCC_PCLK2Config(RCC_HCLK_Div1);
+		/* PCLK2 = HCLK */
+		RCC_PCLK2Config(RCC_HCLK_Div1);
 
-    /* PCLK1 = HCLK/2 */
-    RCC_PCLK1Config(RCC_HCLK_Div2);
+		/* PCLK1 = HCLK/2 */
+		RCC_PCLK1Config(RCC_HCLK_Div2);
 
-    /* PLLCLK = 8MHz * 9 = 72 MHz */
-    RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_9);
+		/* PLLCLK = 8MHz * 9 = 72 MHz */
+		RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_9);
 
-    /* Enable PLL */
-    RCC_PLLCmd(ENABLE);
+		/* Enable PLL */
+		RCC_PLLCmd(ENABLE);
 
-    /* Wait till PLL is ready */
-    while(RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
-    {
-    }
+		/* Wait till PLL is ready */
+		while (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
+		{
+		}
 
-    /* Select PLL as system clock source */
-    RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
+		/* Select PLL as system clock source */
+		RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
 
-    /* Wait till PLL is used as system clock source */
-    while(RCC_GetSYSCLKSource() != 0x08)
-    {
-    }
-  }
+		/* Wait till PLL is used as system clock source */
+		while (RCC_GetSYSCLKSource() != 0x08)
+		{
+		}
+	}
 
-  RCC_APB1PeriphClockCmd( RCC_APB1Periph_USART2 | RCC_APB1Periph_USART3
-		  | RCC_APB1Periph_PWR | RCC_APB1Periph_TIM2 | RCC_APB1Periph_TIM3  | RCC_APB1Periph_TIM4, ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2 | RCC_APB1Periph_USART3 | RCC_APB1Periph_PWR | RCC_APB1Periph_TIM2 | RCC_APB1Periph_TIM3 | RCC_APB1Periph_TIM4, ENABLE);
 
-  RCC_APB2PeriphClockCmd( RCC_APB2Periph_ADC1 | RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOC
-		  | RCC_APB2Periph_GPIOD |  RCC_APB2Periph_USART1  |  RCC_APB2Periph_AFIO | RCC_APB2Periph_SPI1 | RCC_APB2Periph_TIM1 , ENABLE); //
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1 | RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD | RCC_APB2Periph_USART1 | RCC_APB2Periph_AFIO | RCC_APB2Periph_SPI1 | RCC_APB2Periph_TIM1, ENABLE); //
 
-  /* Enable the DMA1 clock */
-  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
-
+	/* Enable the DMA1 clock */
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
 }
 
-void DMA_Configuration		(void)
+void DMA_Configuration(void)
 {
-// инициализация DMA для i2c  OLED дисплея
-	DMA_InitTypeDef  I2CDMA_InitStructure;
+	// РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ DMA РґР»СЏ i2c  OLED РґРёСЃРїР»РµСЏ
+	DMA_InitTypeDef I2CDMA_InitStructure;
 
-	DMA_DeInit(DMA1_Channel6);  // канал DMA1_Channel6 ?
-	I2CDMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)0x40005410;  // адрес i2c1 контроллера
-	I2CDMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)0;   /* This parameter will be configured durig communication */
-	I2CDMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;    /* This parameter will be configured durig communication */
-	I2CDMA_InitStructure.DMA_BufferSize = 0xFFFF;            /* This parameter will be configured durig communication */
+	DMA_DeInit(DMA1_Channel6);											// РєР°РЅР°Р» DMA1_Channel6 ?
+	I2CDMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)0x40005410; // Р°РґСЂРµСЃ i2c1 РєРѕРЅС‚СЂРѕР»Р»РµСЂР°
+	I2CDMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)0;				/* This parameter will be configured durig communication */
+	I2CDMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;				/* This parameter will be configured durig communication */
+	I2CDMA_InitStructure.DMA_BufferSize = 0xFFFF;						/* This parameter will be configured durig communication */
 	I2CDMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
 	I2CDMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
 	I2CDMA_InitStructure.DMA_PeripheralDataSize = DMA_MemoryDataSize_Byte;
@@ -4941,45 +5044,46 @@ void DMA_Configuration		(void)
 	DMA_Init(DMA1_Channel6, &I2CDMA_InitStructure);
 }
 
-// Настройка АЦП1
-void ADC1_Configuration		(void)
+// РќР°СЃС‚СЂРѕР№РєР° РђР¦Рџ1
+void ADC1_Configuration(void)
 {
-	ADC_InitTypeDef 		ADC_InitStructure;
+	ADC_InitTypeDef ADC_InitStructure;
 
-//clock for ADC (max 14MHz --> 72/6=12MHz)
-	RCC_ADCCLKConfig (RCC_PCLK2_Div6);
-// enable ADC system clock
+	// clock for ADC (max 14MHz --> 72/6=12MHz)
+	RCC_ADCCLKConfig(RCC_PCLK2_Div6);
+	// enable ADC system clock
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
 
-// define ADC config
+	// define ADC config
 	ADC_InitStructure.ADC_Mode = ADC_Mode_Independent;
 	ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-	ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;	// we work in continuous sampling mode
+	ADC_InitStructure.ADC_ContinuousConvMode = DISABLE; // we work in continuous sampling mode
 	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None;
 	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
 	ADC_InitStructure.ADC_NbrOfChannel = 1;
 
-	ADC_TempSensorVrefintCmd(ENABLE); // включили встроенный датчик температуры и опору
-	ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_239Cycles5 ); // define regular conversion config
-	ADC_Init ( ADC1, &ADC_InitStructure);	//set config of ADC1
+	ADC_TempSensorVrefintCmd(ENABLE);											 // РІРєР»СЋС‡РёР»Рё РІСЃС‚СЂРѕРµРЅРЅС‹Р№ РґР°С‚С‡РёРє С‚РµРјРїРµСЂР°С‚СѓСЂС‹ Рё РѕРїРѕСЂСѓ
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_239Cycles5); // define regular conversion config
+	ADC_Init(ADC1, &ADC_InitStructure);											 // set config of ADC1
 
-// enable ADC
-	ADC_Cmd (ADC1,ENABLE);	//enable ADC1
+	// enable ADC
+	ADC_Cmd(ADC1, ENABLE); // enable ADC1
 
-//	ADC calibration (optional, but recommended at power on)
-	ADC_ResetCalibration(ADC1);	// Reset previous calibration
-	while(ADC_GetResetCalibrationStatus(ADC1));
-	ADC_StartCalibration(ADC1);	// Start new calibration (ADC must be off at that time)
-	while(ADC_GetCalibrationStatus(ADC1));
+	//	ADC calibration (optional, but recommended at power on)
+	ADC_ResetCalibration(ADC1); // Reset previous calibration
+	while (ADC_GetResetCalibrationStatus(ADC1))
+		;
+	ADC_StartCalibration(ADC1); // Start new calibration (ADC must be off at that time)
+	while (ADC_GetCalibrationStatus(ADC1))
+		;
 
-// start conversion
-	ADC_Cmd (ADC1,ENABLE);	//enable ADC1
-	ADC_SoftwareStartConvCmd(ADC1, ENABLE);	// start conversion (will be endless as we are in continuous mode)
-
+	// start conversion
+	ADC_Cmd(ADC1, ENABLE);					// enable ADC1
+	ADC_SoftwareStartConvCmd(ADC1, ENABLE); // start conversion (will be endless as we are in continuous mode)
 }
 
-// Настройка SPI1
-void SPI1_Configuration		(void)
+// РќР°СЃС‚СЂРѕР№РєР° SPI1
+void SPI1_Configuration(void)
 {
 	SPI_InitTypeDef spi1;
 
@@ -4991,424 +5095,418 @@ void SPI1_Configuration		(void)
 	spi1.SPI_DataSize = SPI_DataSize_8b;
 	spi1.SPI_NSS = SPI_NSS_Soft;
 	spi1.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;
-	SPI_Init(SPI1,&spi1);
-	SPI_Cmd(SPI1,ENABLE);
+	SPI_Init(SPI1, &spi1);
+	SPI_Cmd(SPI1, ENABLE);
 }
 
-// Настройка USART1
+// РќР°СЃС‚СЂРѕР№РєР° USART1
 void USART1_Configuration(void)
 {
-      USART_InitTypeDef USART_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
 
-      /* USART1 configured as follow:
-            - BaudRate = BaudRateUSART1 baud
-            - Word Length = 8 Bits
-            - One Stop Bit
-            - No parity
-            - Hardware flow control disabled (RTS and CTS signals)
-            - Receive and transmit enabled
-            - USART Clock disabled
-            - USART CPOL: Clock is active low
-            - USART CPHA: Data is captured on the middle
-            - USART LastBit: The clock pulse of the last data bit is not output to
-                             the SCLK pin
-      */
-      USART_InitStructure.USART_BaudRate            = BaudRateUSART1;
-      USART_InitStructure.USART_WordLength          = USART_WordLength_8b;
-      USART_InitStructure.USART_StopBits            = USART_StopBits_1;
-      USART_InitStructure.USART_Parity              = USART_Parity_No ;
-      USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-      USART_InitStructure.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
-      USART_Init(USART1, &USART_InitStructure);
+	/* USART1 configured as follow:
+		  - BaudRate = BaudRateUSART1 baud
+		  - Word Length = 8 Bits
+		  - One Stop Bit
+		  - No parity
+		  - Hardware flow control disabled (RTS and CTS signals)
+		  - Receive and transmit enabled
+		  - USART Clock disabled
+		  - USART CPOL: Clock is active low
+		  - USART CPHA: Data is captured on the middle
+		  - USART LastBit: The clock pulse of the last data bit is not output to
+						   the SCLK pin
+	*/
+	USART_InitStructure.USART_BaudRate = BaudRateUSART1;
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	USART_InitStructure.USART_Parity = USART_Parity_No;
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	USART_Init(USART1, &USART_InitStructure);
 
-      USART_Cmd(USART1, ENABLE);
+	USART_Cmd(USART1, ENABLE);
 }
 
-// Настройка USART2 BLE
+// РќР°СЃС‚СЂРѕР№РєР° USART2 BLE
 void USART2_Configuration(void)
 {
-      USART_InitTypeDef USART_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
 
-      /* USART2 configured as follow:
-            - BaudRate = BaudRateUSART2 baud
-            - Word Length = 8 Bits
-            - One Stop Bit
-            - No parity
-            - Hardware flow control disabled (RTS and CTS signals)
-            - Receive and transmit enabled
-            - USART Clock disabled
-            - USART CPOL: Clock is active low
-            - USART CPHA: Data is captured on the middle
-            - USART LastBit: The clock pulse of the last data bit is not output to
-                             the SCLK pin
-      */
-      USART_InitStructure.USART_BaudRate            = BaudRateUSART2;
-      USART_InitStructure.USART_WordLength          = USART_WordLength_8b;
-      USART_InitStructure.USART_StopBits            = USART_StopBits_1;
-      USART_InitStructure.USART_Parity              = USART_Parity_No ;
-      USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-      USART_InitStructure.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
-      USART_Init(USART2, &USART_InitStructure);
+	/* USART2 configured as follow:
+		  - BaudRate = BaudRateUSART2 baud
+		  - Word Length = 8 Bits
+		  - One Stop Bit
+		  - No parity
+		  - Hardware flow control disabled (RTS and CTS signals)
+		  - Receive and transmit enabled
+		  - USART Clock disabled
+		  - USART CPOL: Clock is active low
+		  - USART CPHA: Data is captured on the middle
+		  - USART LastBit: The clock pulse of the last data bit is not output to
+						   the SCLK pin
+	*/
+	USART_InitStructure.USART_BaudRate = BaudRateUSART2;
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	USART_InitStructure.USART_Parity = USART_Parity_No;
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	USART_Init(USART2, &USART_InitStructure);
 
-      USART_Cmd(USART2, ENABLE);
+	USART_Cmd(USART2, ENABLE);
 }
 
-// Настройка USART2 BLE 115200 бод
+// РќР°СЃС‚СЂРѕР№РєР° USART2 BLE 115200 Р±РѕРґ
 void USART2_Configuration115200(void)
 {
-      USART_InitTypeDef USART_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
 
-      /* USART3 configured as follow:
-            - BaudRate = BaudRateUSART3 baud
-            - Word Length = 8 Bits
-            - One Stop Bit
-            - No parity
-            - Hardware flow control disabled (RTS and CTS signals)
-            - Receive and transmit enabled
-            - USART Clock disabled
-            - USART CPOL: Clock is active low
-            - USART CPHA: Data is captured on the middle
-            - USART LastBit: The clock pulse of the last data bit is not output to
-                             the SCLK pin
-      */
-      USART_InitStructure.USART_BaudRate            = 115200;
-      USART_InitStructure.USART_WordLength          = USART_WordLength_8b;
-      USART_InitStructure.USART_StopBits            = USART_StopBits_1;
-      USART_InitStructure.USART_Parity              = USART_Parity_No ;
-      USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-      USART_InitStructure.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
-      USART_Init(USART2, &USART_InitStructure);
+	/* USART3 configured as follow:
+		  - BaudRate = BaudRateUSART3 baud
+		  - Word Length = 8 Bits
+		  - One Stop Bit
+		  - No parity
+		  - Hardware flow control disabled (RTS and CTS signals)
+		  - Receive and transmit enabled
+		  - USART Clock disabled
+		  - USART CPOL: Clock is active low
+		  - USART CPHA: Data is captured on the middle
+		  - USART LastBit: The clock pulse of the last data bit is not output to
+						   the SCLK pin
+	*/
+	USART_InitStructure.USART_BaudRate = 115200;
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	USART_InitStructure.USART_Parity = USART_Parity_No;
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	USART_Init(USART2, &USART_InitStructure);
 
-      USART_Cmd(USART2, ENABLE);
+	USART_Cmd(USART2, ENABLE);
 }
 
-// Настройка USART3 GPS 9600 бод
+// РќР°СЃС‚СЂРѕР№РєР° USART3 GPS 9600 Р±РѕРґ
 void USART3_Configuration(void)
 {
-      USART_InitTypeDef USART_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
 
-      /* USART3 configured as follow:
-            - BaudRate = BaudRateUSART3 baud
-            - Word Length = 8 Bits
-            - One Stop Bit
-            - No parity
-            - Hardware flow control disabled (RTS and CTS signals)
-            - Receive and transmit enabled
-            - USART Clock disabled
-            - USART CPOL: Clock is active low
-            - USART CPHA: Data is captured on the middle
-            - USART LastBit: The clock pulse of the last data bit is not output to
-                             the SCLK pin
-      */
-      USART_InitStructure.USART_BaudRate            = BaudRateUSART3;
-      USART_InitStructure.USART_WordLength          = USART_WordLength_8b;
-      USART_InitStructure.USART_StopBits            = USART_StopBits_1;
-      USART_InitStructure.USART_Parity              = USART_Parity_No ;
-      USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-      USART_InitStructure.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
-      USART_Init(USART3, &USART_InitStructure);
+	/* USART3 configured as follow:
+		  - BaudRate = BaudRateUSART3 baud
+		  - Word Length = 8 Bits
+		  - One Stop Bit
+		  - No parity
+		  - Hardware flow control disabled (RTS and CTS signals)
+		  - Receive and transmit enabled
+		  - USART Clock disabled
+		  - USART CPOL: Clock is active low
+		  - USART CPHA: Data is captured on the middle
+		  - USART LastBit: The clock pulse of the last data bit is not output to
+						   the SCLK pin
+	*/
+	USART_InitStructure.USART_BaudRate = BaudRateUSART3;
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	USART_InitStructure.USART_Parity = USART_Parity_No;
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	USART_Init(USART3, &USART_InitStructure);
 
-      USART_Cmd(USART3, ENABLE);
+	USART_Cmd(USART3, ENABLE);
 }
 
-// Настройка USART3 GPS 115200 бод
+// РќР°СЃС‚СЂРѕР№РєР° USART3 GPS 115200 Р±РѕРґ
 void USART3_Configuration115200(void)
 {
-      USART_InitTypeDef USART_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
 
-      /* USART3 configured as follow:
-            - BaudRate = BaudRateUSART3 baud
-            - Word Length = 8 Bits
-            - One Stop Bit
-            - No parity
-            - Hardware flow control disabled (RTS and CTS signals)
-            - Receive and transmit enabled
-            - USART Clock disabled
-            - USART CPOL: Clock is active low
-            - USART CPHA: Data is captured on the middle
-            - USART LastBit: The clock pulse of the last data bit is not output to
-                             the SCLK pin
-      */
-      USART_InitStructure.USART_BaudRate            = 115200;
-      USART_InitStructure.USART_WordLength          = USART_WordLength_8b;
-      USART_InitStructure.USART_StopBits            = USART_StopBits_1;
-      USART_InitStructure.USART_Parity              = USART_Parity_No ;
-      USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-      USART_InitStructure.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
-      USART_Init(USART3, &USART_InitStructure);
+	/* USART3 configured as follow:
+		  - BaudRate = BaudRateUSART3 baud
+		  - Word Length = 8 Bits
+		  - One Stop Bit
+		  - No parity
+		  - Hardware flow control disabled (RTS and CTS signals)
+		  - Receive and transmit enabled
+		  - USART Clock disabled
+		  - USART CPOL: Clock is active low
+		  - USART CPHA: Data is captured on the middle
+		  - USART LastBit: The clock pulse of the last data bit is not output to
+						   the SCLK pin
+	*/
+	USART_InitStructure.USART_BaudRate = 115200;
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	USART_InitStructure.USART_Parity = USART_Parity_No;
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	USART_Init(USART3, &USART_InitStructure);
 
-      USART_Cmd(USART3, ENABLE);
+	USART_Cmd(USART3, ENABLE);
 }
 
-// Настройка прерываний и размещение таблицы векторов прерываний
+// РќР°СЃС‚СЂРѕР№РєР° РїСЂРµСЂС‹РІР°РЅРёР№ Рё СЂР°Р·РјРµС‰РµРЅРёРµ С‚Р°Р±Р»РёС†С‹ РІРµРєС‚РѕСЂРѕРІ РїСЂРµСЂС‹РІР°РЅРёР№
 void NVIC_Configuration(void)
 {
-	 NVIC_InitTypeDef NVIC_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
 
-#ifdef  VECT_TAB_RAM
-  /* Set the Vector Table base location at 0x20000000 */
-  NVIC_SetVectorTable(NVIC_VectTab_RAM, 0x0);
-#else  /* VECT_TAB_FLASH  */
-  /* Set the Vector Table base location at 0x08000000 */
-  NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x0);
+#ifdef VECT_TAB_RAM
+	/* Set the Vector Table base location at 0x20000000 */
+	NVIC_SetVectorTable(NVIC_VectTab_RAM, 0x0);
+#else /* VECT_TAB_FLASH  */
+	/* Set the Vector Table base location at 0x08000000 */
+	NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x0);
 #endif
-    /* Configure one bit for preemption priority */
-   // NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+	/* Configure one bit for preemption priority */
+	// NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
 
-    NVIC_SetPriority(SysTick_IRQn, 0x03); 		// приоритет прерывания от системного таймера
+	NVIC_SetPriority(SysTick_IRQn, 0x03); // РїСЂРёРѕСЂРёС‚РµС‚ РїСЂРµСЂС‹РІР°РЅРёСЏ РѕС‚ СЃРёСЃС‚РµРјРЅРѕРіРѕ С‚Р°Р№РјРµСЂР°
 
-    /* Enable the USART1 Interrupt */
-    NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 6;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 6;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-
-    /* Enable the USART2 Interrupt */
-    NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 5;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 5;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-
-    /* Enable the USART3 Interrupt */
-    NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 4;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 4;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-
-	/* Enable the EXTI Interrupt */
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI15_10_IRQn ; 				// прерывание от внешнего сигнала 1PPS на PB12 todo
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x00 ;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE ;
+	/* Enable the USART1 Interrupt */
+	NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 6;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 6;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	//enable tim1 irq
+	/* Enable the USART2 Interrupt */
+	NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 5;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 5;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	/* Enable the USART3 Interrupt */
+	NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 4;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 4;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	/* Enable the EXTI Interrupt */
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI15_10_IRQn; // РїСЂРµСЂС‹РІР°РЅРёРµ РѕС‚ РІРЅРµС€РЅРµРіРѕ СЃРёРіРЅР°Р»Р° 1PPS РЅР° PB12 todo
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x00;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	// enable tim1 irq
 	NVIC_InitStructure.NVIC_IRQChannel = TIM1_UP_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
-	//NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	// NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	//enable tim2 irq
+	// enable tim2 irq
 	NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;
-	//NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	// NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	//enable tim3 irq
+	// enable tim3 irq
 	NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;
-	//NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	// NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	//enable tim4 irq
+	// enable tim4 irq
 	NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
-	//NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	// NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	//enable I2C1_EV_IRQn irq
+	// enable I2C1_EV_IRQn irq
 	NVIC_InitStructure.NVIC_IRQChannel = I2C1_EV_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 6;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 6;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	//enable I2C1_ER_IRQn irq
+	// enable I2C1_ER_IRQn irq
 	NVIC_InitStructure.NVIC_IRQChannel = I2C1_ER_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 7;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 7;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
-
 }
 
-// Настройка Таймера1. Таймер формирует сигнал, заменяющий 1PPS при его отсутствии
-void TIM1_Configuration		(void) //
+// РќР°СЃС‚СЂРѕР№РєР° РўР°Р№РјРµСЂР°1. РўР°Р№РјРµСЂ С„РѕСЂРјРёСЂСѓРµС‚ СЃРёРіРЅР°Р», Р·Р°РјРµРЅСЏСЋС‰РёР№ 1PPS РїСЂРё РµРіРѕ РѕС‚СЃСѓС‚СЃС‚РІРёРё
+void TIM1_Configuration(void) //
 {
 	TIM_TimeBaseInitTypeDef base_timer;
 
 	TIM_TimeBaseStructInit(&base_timer);
-/* Делитель учитывается как TIM_Prescaler + 1, поэтому отнимаем 1 */
-	base_timer.TIM_Prescaler = 12-1; 	// шина ABP1 36 Mhz, но APB1TIM = 72. Prescaler делит на 12 , тактовая частота таймера 6 МГц
-	base_timer.TIM_Period = 0xFFFF;		// ARR - Auto Reload Register. До какого значения считать вверх до переполнения			//
-	base_timer.TIM_CounterMode = TIM_CounterMode_Up; 	// считать вверх
+	/* Р”РµР»РёС‚РµР»СЊ СѓС‡РёС‚С‹РІР°РµС‚СЃСЏ РєР°Рє TIM_Prescaler + 1, РїРѕСЌС‚РѕРјСѓ РѕС‚РЅРёРјР°РµРј 1 */
+	base_timer.TIM_Prescaler = 12 - 1;				 // С€РёРЅР° ABP1 36 Mhz, РЅРѕ APB1TIM = 72. Prescaler РґРµР»РёС‚ РЅР° 12 , С‚Р°РєС‚РѕРІР°СЏ С‡Р°СЃС‚РѕС‚Р° С‚Р°Р№РјРµСЂР° 6 РњР“С†
+	base_timer.TIM_Period = 0xFFFF;					 // ARR - Auto Reload Register. Р”Рѕ РєР°РєРѕРіРѕ Р·РЅР°С‡РµРЅРёСЏ СЃС‡РёС‚Р°С‚СЊ РІРІРµСЂС… РґРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЏ			//
+	base_timer.TIM_CounterMode = TIM_CounterMode_Up; // СЃС‡РёС‚Р°С‚СЊ РІРІРµСЂС…
 	TIM_TimeBaseInit(TIM1, &base_timer);
-	//TIM4->CR1 |= TIM_CR1_OPM; 						// режим одного импульса
+	// TIM4->CR1 |= TIM_CR1_OPM; 						// СЂРµР¶РёРј РѕРґРЅРѕРіРѕ РёРјРїСѓР»СЊСЃР°
 
-/* Очищаем бит  прерывания */
-	//TIM_ClearITPendingBit(TIM1, TIM_FLAG_Update); 	// также работает TIM_FLAG_Update
-  // Разрешаем прерывание по обновлению (в данном случае - по переполнению) счётчика таймера TIM1.
+	/* РћС‡РёС‰Р°РµРј Р±РёС‚  РїСЂРµСЂС‹РІР°РЅРёСЏ */
+	// TIM_ClearITPendingBit(TIM1, TIM_FLAG_Update); 	// С‚Р°РєР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ TIM_FLAG_Update
+	// Р Р°Р·СЂРµС€Р°РµРј РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РѕР±РЅРѕРІР»РµРЅРёСЋ (РІ РґР°РЅРЅРѕРј СЃР»СѓС‡Р°Рµ - РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ) СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM1.
 
 	TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
-  // Разрешаем обработку прерывания по переполнению счётчика таймера TIM1.
+	// Р Р°Р·СЂРµС€Р°РµРј РѕР±СЂР°Р±РѕС‚РєСѓ РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM1.
 
-	//TIM_Cmd(TIM1, ENABLE);  			// запуск таймера
-	NVIC_EnableIRQ(TIM1_UP_IRQn);	 	// прерывание из-за переполнения таймера
-
+	// TIM_Cmd(TIM1, ENABLE);  			// Р·Р°РїСѓСЃРє С‚Р°Р№РјРµСЂР°
+	NVIC_EnableIRQ(TIM1_UP_IRQn); // РїСЂРµСЂС‹РІР°РЅРёРµ РёР·-Р·Р° РїРµСЂРµРїРѕР»РЅРµРЅРёСЏ С‚Р°Р№РјРµСЂР°
 }
 
-// Настройка Таймера2 Basic Таймер запускается по приему байта по USART2 от BLE модуля
-void TIM2_Configuration		(void)
+// РќР°СЃС‚СЂРѕР№РєР° РўР°Р№РјРµСЂР°2 Basic РўР°Р№РјРµСЂ Р·Р°РїСѓСЃРєР°РµС‚СЃСЏ РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р° РїРѕ USART2 РѕС‚ BLE РјРѕРґСѓР»СЏ
+void TIM2_Configuration(void)
 {
 	TIM_TimeBaseInitTypeDef base_timer;
 
 	TIM_TimeBaseStructInit(&base_timer);
-/* Делитель учитывается как TIM_Prescaler + 1, поэтому отнимаем 1 */
-	base_timer.TIM_Prescaler = 36000 - 1; 			// шина ABP1 36 Mhz, но APB1TIM = 72
-	base_timer.TIM_Period = 30*2-1; 				// задержка в мс  (ms*2-1)
+	/* Р”РµР»РёС‚РµР»СЊ СѓС‡РёС‚С‹РІР°РµС‚СЃСЏ РєР°Рє TIM_Prescaler + 1, РїРѕСЌС‚РѕРјСѓ РѕС‚РЅРёРјР°РµРј 1 */
+	base_timer.TIM_Prescaler = 36000 - 1; // С€РёРЅР° ABP1 36 Mhz, РЅРѕ APB1TIM = 72
+	base_timer.TIM_Period = 30 * 2 - 1;	  // Р·Р°РґРµСЂР¶РєР° РІ РјСЃ  (ms*2-1)
 	base_timer.TIM_CounterMode = TIM_CounterMode_Up;
 	base_timer.TIM_RepetitionCounter = 0;
-	base_timer.TIM_ClockDivision = TIM_CKD_DIV1; 	// делитель внешней частоты
+	base_timer.TIM_ClockDivision = TIM_CKD_DIV1; // РґРµР»РёС‚РµР»СЊ РІРЅРµС€РЅРµР№ С‡Р°СЃС‚РѕС‚С‹
 	TIM_TimeBaseInit(TIM2, &base_timer);
-	TIM2->CR1 |= TIM_CR1_OPM; 		// режим одного импульса
+	TIM2->CR1 |= TIM_CR1_OPM; // СЂРµР¶РёРј РѕРґРЅРѕРіРѕ РёРјРїСѓР»СЊСЃР°
 
-/* Очищаем бит  прерывания */
-    TIM_ClearITPendingBit(TIM2, TIM_FLAG_Update); // также работает TIM_FLAG_Update
+	/* РћС‡РёС‰Р°РµРј Р±РёС‚  РїСЂРµСЂС‹РІР°РЅРёСЏ */
+	TIM_ClearITPendingBit(TIM2, TIM_FLAG_Update); // С‚Р°РєР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ TIM_FLAG_Update
 
-  // Разрешаем прерывание по обновлению (в данном случае - по переполнению) счётчика таймера TIM2.
+	// Р Р°Р·СЂРµС€Р°РµРј РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РѕР±РЅРѕРІР»РµРЅРёСЋ (РІ РґР°РЅРЅРѕРј СЃР»СѓС‡Р°Рµ - РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ) СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM2.
 
 	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
-  // Разрешаем обработку прерывания по переполнению счётчика таймера TIM2.
+	// Р Р°Р·СЂРµС€Р°РµРј РѕР±СЂР°Р±РѕС‚РєСѓ РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM2.
 
-	NVIC_EnableIRQ(TIM2_IRQn);	// TIM2_IRQn
-
+	NVIC_EnableIRQ(TIM2_IRQn); // TIM2_IRQn
 }
 
-// Настройка Таймера3 Basic  Таймер запускается по приему байта по USART3 от GPS модуля SIM33ELA,
-void TIM3_Configuration		(void) //  ждет паузу между посылками 10 мс, генерирует прерывание
+// РќР°СЃС‚СЂРѕР№РєР° РўР°Р№РјРµСЂР°3 Basic  РўР°Р№РјРµСЂ Р·Р°РїСѓСЃРєР°РµС‚СЃСЏ РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р° РїРѕ USART3 РѕС‚ GPS РјРѕРґСѓР»СЏ SIM33ELA,
+void TIM3_Configuration(void) //  Р¶РґРµС‚ РїР°СѓР·Сѓ РјРµР¶РґСѓ РїРѕСЃС‹Р»РєР°РјРё 10 РјСЃ, РіРµРЅРµСЂРёСЂСѓРµС‚ РїСЂРµСЂС‹РІР°РЅРёРµ
 {
 	TIM_TimeBaseInitTypeDef base_timer;
 
 	TIM_TimeBaseStructInit(&base_timer);
-/* Делитель учитывается как TIM_Prescaler + 1, поэтому отнимаем 1 */
-	base_timer.TIM_Prescaler = 36000 - 1; 			// шина ABP1 36 Mhz, но APB1TIM = 72. Нам надо 1 kHz .
-	base_timer.TIM_Period = 10*2-1;					// задержка в мс  (ms*2-1)
+	/* Р”РµР»РёС‚РµР»СЊ СѓС‡РёС‚С‹РІР°РµС‚СЃСЏ РєР°Рє TIM_Prescaler + 1, РїРѕСЌС‚РѕРјСѓ РѕС‚РЅРёРјР°РµРј 1 */
+	base_timer.TIM_Prescaler = 36000 - 1; // С€РёРЅР° ABP1 36 Mhz, РЅРѕ APB1TIM = 72. РќР°Рј РЅР°РґРѕ 1 kHz .
+	base_timer.TIM_Period = 10 * 2 - 1;	  // Р·Р°РґРµСЂР¶РєР° РІ РјСЃ  (ms*2-1)
 	base_timer.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_TimeBaseInit(TIM3, &base_timer);
-	TIM3->CR1 |= TIM_CR1_OPM; 						// режим одного импульса
+	TIM3->CR1 |= TIM_CR1_OPM; // СЂРµР¶РёРј РѕРґРЅРѕРіРѕ РёРјРїСѓР»СЊСЃР°
 
-/* Очищаем бит  прерывания */
-	TIM_ClearITPendingBit(TIM3, TIM_FLAG_Update); 	// также работает TIM_FLAG_Update
-  // Разрешаем прерывание по обновлению (в данном случае - по переполнению) счётчика таймера TIM3.
+	/* РћС‡РёС‰Р°РµРј Р±РёС‚  РїСЂРµСЂС‹РІР°РЅРёСЏ */
+	TIM_ClearITPendingBit(TIM3, TIM_FLAG_Update); // С‚Р°РєР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ TIM_FLAG_Update
+												  // Р Р°Р·СЂРµС€Р°РµРј РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РѕР±РЅРѕРІР»РµРЅРёСЋ (РІ РґР°РЅРЅРѕРј СЃР»СѓС‡Р°Рµ - РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ) СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM3.
 
 	TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
-  // Разрешаем обработку прерывания по переполнению счётчика таймера TIM3.
+	// Р Р°Р·СЂРµС€Р°РµРј РѕР±СЂР°Р±РѕС‚РєСѓ РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM3.
 
-	NVIC_EnableIRQ(TIM3_IRQn);	//TIM3_IRQn
+	NVIC_EnableIRQ(TIM3_IRQn); // TIM3_IRQn
 }
 
-// Настройка Таймера4 Basic
-void TIM4_Configuration		(void) //
+// РќР°СЃС‚СЂРѕР№РєР° РўР°Р№РјРµСЂР°4 Basic
+void TIM4_Configuration(void) //
 {
 	TIM_TimeBaseInitTypeDef base_timer;
 
 	TIM_TimeBaseStructInit(&base_timer);
-/* Делитель учитывается как TIM_Prescaler + 1, поэтому отнимаем 1 */
-	base_timer.TIM_Prescaler = 12-1; 	// шина ABP1 36 Mhz, но APB1TIM = 72. Prescaler делит на 12 , тактовая частота таймера 6 МГц
-	base_timer.TIM_Period = 0xFFFF;			// ARR - Auto Reload Register. До какого значения считать вверх до переполнения			//
-	base_timer.TIM_CounterMode = TIM_CounterMode_Up; 	// считать вверх
+	/* Р”РµР»РёС‚РµР»СЊ СѓС‡РёС‚С‹РІР°РµС‚СЃСЏ РєР°Рє TIM_Prescaler + 1, РїРѕСЌС‚РѕРјСѓ РѕС‚РЅРёРјР°РµРј 1 */
+	base_timer.TIM_Prescaler = 12 - 1;				 // С€РёРЅР° ABP1 36 Mhz, РЅРѕ APB1TIM = 72. Prescaler РґРµР»РёС‚ РЅР° 12 , С‚Р°РєС‚РѕРІР°СЏ С‡Р°СЃС‚РѕС‚Р° С‚Р°Р№РјРµСЂР° 6 РњР“С†
+	base_timer.TIM_Period = 0xFFFF;					 // ARR - Auto Reload Register. Р”Рѕ РєР°РєРѕРіРѕ Р·РЅР°С‡РµРЅРёСЏ СЃС‡РёС‚Р°С‚СЊ РІРІРµСЂС… РґРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЏ			//
+	base_timer.TIM_CounterMode = TIM_CounterMode_Up; // СЃС‡РёС‚Р°С‚СЊ РІРІРµСЂС…
 	TIM_TimeBaseInit(TIM4, &base_timer);
-	//TIM4->CR1 |= TIM_CR1_OPM; 						// режим одного импульса
+	// TIM4->CR1 |= TIM_CR1_OPM; 						// СЂРµР¶РёРј РѕРґРЅРѕРіРѕ РёРјРїСѓР»СЊСЃР°
 
-/* Очищаем бит  прерывания */
-	//TIM_ClearITPendingBit(TIM4, TIM_FLAG_Update); 	// также работает TIM_FLAG_Update
-  // Разрешаем прерывание по обновлению (в данном случае - по переполнению) счётчика таймера TIM4.
+	/* РћС‡РёС‰Р°РµРј Р±РёС‚  РїСЂРµСЂС‹РІР°РЅРёСЏ */
+	// TIM_ClearITPendingBit(TIM4, TIM_FLAG_Update); 	// С‚Р°РєР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ TIM_FLAG_Update
+	// Р Р°Р·СЂРµС€Р°РµРј РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РѕР±РЅРѕРІР»РµРЅРёСЋ (РІ РґР°РЅРЅРѕРј СЃР»СѓС‡Р°Рµ - РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ) СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM4.
 
 	TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
-  // Разрешаем обработку прерывания по переполнению счётчика таймера TIM4.
+	// Р Р°Р·СЂРµС€Р°РµРј РѕР±СЂР°Р±РѕС‚РєСѓ РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM4.
 
-	TIM_Cmd(TIM4, ENABLE);  		// запуск таймера
-	NVIC_EnableIRQ(TIM4_IRQn);	 	// TIM4_IRQn
-
-
+	TIM_Cmd(TIM4, ENABLE);	   // Р·Р°РїСѓСЃРє С‚Р°Р№РјРµСЂР°
+	NVIC_EnableIRQ(TIM4_IRQn); // TIM4_IRQn
 }
 
-void EXTI_Configuration		(void) // настройка прерывания от 1PPS сигнала
+void EXTI_Configuration(void) // РЅР°СЃС‚СЂРѕР№РєР° РїСЂРµСЂС‹РІР°РЅРёСЏ РѕС‚ 1PPS СЃРёРіРЅР°Р»Р°
 {
-	EXTI_InitTypeDef EXTI_InitStructure ;
+	EXTI_InitTypeDef EXTI_InitStructure;
 
-	GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource12); // источник прерывания - PB12
-	EXTI_InitStructure.EXTI_Line = EXTI_Line12 ;
-	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt ;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising ;
-	EXTI_InitStructure.EXTI_LineCmd = ENABLE ;
-	EXTI_Init (&EXTI_InitStructure) ;
+	GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource12); // РёСЃС‚РѕС‡РЅРёРє РїСЂРµСЂС‹РІР°РЅРёСЏ - PB12
+	EXTI_InitStructure.EXTI_Line = EXTI_Line12;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
 }
 
 /******************************************************************************/
 /*  -------------- STM32F10x Peripherals Interrupt Handlers ---------------   */
 /******************************************************************************/
 
-void SysTick_Handler(void) 		// прерывание от системного таймера, вызывается каждую миллисекунду
+void SysTick_Handler(void) // РїСЂРµСЂС‹РІР°РЅРёРµ РѕС‚ СЃРёСЃС‚РµРјРЅРѕРіРѕ С‚Р°Р№РјРµСЂР°, РІС‹Р·С‹РІР°РµС‚СЃСЏ РєР°Р¶РґСѓСЋ РјРёР»Р»РёСЃРµРєСѓРЅРґСѓ
 {
 	u8 nn;
-	timer1ms ++; // счетчик мс
-//	if (timer1ms == 1000000000) // сброс счетчика каждый миллиард миллисекунд
-//		timer1ms = 0;
-	if ((timer1ms % 1000) == 0) // если делится без остатка на 1000
-		timer1s ++; // счетчик cекунд
+	timer1ms++;					// СЃС‡РµС‚С‡РёРє РјСЃ
+								//	if (timer1ms == 1000000000) // СЃР±СЂРѕСЃ СЃС‡РµС‚С‡РёРєР° РєР°Р¶РґС‹Р№ РјРёР»Р»РёР°СЂРґ РјРёР»Р»РёСЃРµРєСѓРЅРґ
+								//		timer1ms = 0;
+	if ((timer1ms % 1000) == 0) // РµСЃР»Рё РґРµР»РёС‚СЃСЏ Р±РµР· РѕСЃС‚Р°С‚РєР° РЅР° 1000
+		timer1s++;				// СЃС‡РµС‚С‡РёРє cРµРєСѓРЅРґ
 
-	if (counterRXDisplay > 0) // счетчик видимости RX на дисплее
+	if (counterRXDisplay > 0) // СЃС‡РµС‚С‡РёРє РІРёРґРёРјРѕСЃС‚Рё RX РЅР° РґРёСЃРїР»РµРµ
 	{
-		counterRXDisplay -- ;
+		counterRXDisplay--;
 	}
 
-	if (counterTXDisplay > 0) // счетчик видимости TX на дисплее
+	if (counterTXDisplay > 0) // СЃС‡РµС‚С‡РёРє РІРёРґРёРјРѕСЃС‚Рё TX РЅР° РґРёСЃРїР»РµРµ
 	{
-		counterTXDisplay -- ;
+		counterTXDisplay--;
 	}
 
-	if (counterMaxRssiReset > 0) 	// счетчик сброса максимального уровня RSSI
+	if (counterMaxRssiReset > 0) // СЃС‡РµС‚С‡РёРє СЃР±СЂРѕСЃР° РјР°РєСЃРёРјР°Р»СЊРЅРѕРіРѕ СѓСЂРѕРІРЅСЏ RSSI
 	{
-		counterMaxRssiReset -- ;
+		counterMaxRssiReset--;
 	}
 
-	for (nn = 0; nn < 10; nn++) 	// счетчики сброса уровня RSSI
+	for (nn = 0; nn < 10; nn++) // СЃС‡РµС‚С‡РёРєРё СЃР±СЂРѕСЃР° СѓСЂРѕРІРЅСЏ RSSI
 		if (counterRssiReset[nn] > 0)
-			counterRssiReset[nn] -- ;
+			counterRssiReset[nn]--;
 
-	if (counterLed0 > 0) 	// счетчик светодиода LED0 - Синего
+	if (counterLed0 > 0) // СЃС‡РµС‚С‡РёРє СЃРІРµС‚РѕРґРёРѕРґР° LED0 - РЎРёРЅРµРіРѕ
 	{
-		counterLed0 -- ;
+		counterLed0--;
 		if (counterLed0 == 0)
 			OffLED0();
 	}
 
-	if (counterLed1 > 0) 	// счетчик светодиода LED1 - Красного
+	if (counterLed1 > 0) // СЃС‡РµС‚С‡РёРє СЃРІРµС‚РѕРґРёРѕРґР° LED1 - РљСЂР°СЃРЅРѕРіРѕ
 	{
-		counterLed1 -- ;
+		counterLed1--;
 		if (counterLed1 == 0)
 			OffLED1();
 	}
 
 	if (counterLcdOff > 0)
 	{
-		counterLcdOff -- ;
+		counterLcdOff--;
 	}
-
 }
 
 /**
-  * @brief  This function handles USART1 global interrupt request.
-  * Кольцевой буфер размером NUM+1
-  * В конце данных в буфере пишется \0
-  * При наличии данных в буфере поднимается флаг triggerUSART1Interupt
-  */
-void USART1_IRQHandler(void)  	// терминал на ПК
+ * @brief  This function handles USART1 global interrupt request.
+ * РљРѕР»СЊС†РµРІРѕР№ Р±СѓС„РµСЂ СЂР°Р·РјРµСЂРѕРј NUM+1
+ * Р’ РєРѕРЅС†Рµ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ РїРёС€РµС‚СЃСЏ \0
+ * РџСЂРё РЅР°Р»РёС‡РёРё РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ РїРѕРґРЅРёРјР°РµС‚СЃСЏ С„Р»Р°Рі triggerUSART1Interupt
+ */
+void USART1_IRQHandler(void) // С‚РµСЂРјРёРЅР°Р» РЅР° РџРљ
 {
 	u8 TempDataUSART1;
 
-    if ((USART1->SR & USART_FLAG_RXNE) != (u16)RESET)	//  проверка флага прерывания RXNE - по приему байта
+	if ((USART1->SR & USART_FLAG_RXNE) != (u16)RESET) //  РїСЂРѕРІРµСЂРєР° С„Р»Р°РіР° РїСЂРµСЂС‹РІР°РЅРёСЏ RXNE - РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р°
 	{
-		TempDataUSART1 = USART_ReceiveData(USART1);		// читаем байт из буфера
-		if(counterUSART1Buffer == BufferUSART1Size)		// пишем в буфер по кругу
+		TempDataUSART1 = USART_ReceiveData(USART1);	 // С‡РёС‚Р°РµРј Р±Р°Р№С‚ РёР· Р±СѓС„РµСЂР°
+		if (counterUSART1Buffer == BufferUSART1Size) // РїРёС€РµРј РІ Р±СѓС„РµСЂ РїРѕ РєСЂСѓРіСѓ
 		{
 			BufferUSART1RX[counterUSART1Buffer] = TempDataUSART1;
 			counterUSART1Buffer = 0;
@@ -5417,31 +5515,31 @@ void USART1_IRQHandler(void)  	// терминал на ПК
 		{
 			BufferUSART1RX[counterUSART1Buffer++] = TempDataUSART1;
 		}
-		BufferUSART1RX[counterUSART1Buffer] = '\0';		// после данных в буфер пишем NULL \0
+		BufferUSART1RX[counterUSART1Buffer] = '\0'; // РїРѕСЃР»Рµ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂ РїРёС€РµРј NULL \0
 
-		triggerUSART1Interrupt = 1; 					// установили флаг
+		triggerUSART1Interrupt = 1; // СѓСЃС‚Р°РЅРѕРІРёР»Рё С„Р»Р°Рі
 	}
 }
 
 /**
-  * @brief  This function handles USART2 global interrupt request.
-  * @param  None
-  * @retval None
-  * Кольцевой буфер размером NUM+1
-  * В конце данных в буфере пишется \0
-  * При наличии данных в буфере поднимается флаг triggerUSART2Interupt
-  */
-void USART2_IRQHandler(void) 	// прерывание по приему байта от BLE модуля
+ * @brief  This function handles USART2 global interrupt request.
+ * @param  None
+ * @retval None
+ * РљРѕР»СЊС†РµРІРѕР№ Р±СѓС„РµСЂ СЂР°Р·РјРµСЂРѕРј NUM+1
+ * Р’ РєРѕРЅС†Рµ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ РїРёС€РµС‚СЃСЏ \0
+ * РџСЂРё РЅР°Р»РёС‡РёРё РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ РїРѕРґРЅРёРјР°РµС‚СЃСЏ С„Р»Р°Рі triggerUSART2Interupt
+ */
+void USART2_IRQHandler(void) // РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р° РѕС‚ BLE РјРѕРґСѓР»СЏ
 {
 	u8 TempDataUSART2;
 
-    if ((USART2->SR & USART_FLAG_RXNE) != (u16)RESET)	//  проверка флага прерывания RXNE - по приему байта
+	if ((USART2->SR & USART_FLAG_RXNE) != (u16)RESET) //  РїСЂРѕРІРµСЂРєР° С„Р»Р°РіР° РїСЂРµСЂС‹РІР°РЅРёСЏ RXNE - РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р°
 	{
-    	TIM_Cmd(TIM2, ENABLE);  // запуск таймера
-    	TIM2 -> CNT = 0;		// сброс счетчика таймера
+		TIM_Cmd(TIM2, ENABLE); // Р·Р°РїСѓСЃРє С‚Р°Р№РјРµСЂР°
+		TIM2->CNT = 0;		   // СЃР±СЂРѕСЃ СЃС‡РµС‚С‡РёРєР° С‚Р°Р№РјРµСЂР°
 
-		TempDataUSART2 = USART_ReceiveData(USART2);		// читаем байт из буфера
-		if(counterUSART2Buffer == BufferUSART2Size)		// пишем в буфер по кругу
+		TempDataUSART2 = USART_ReceiveData(USART2);	 // С‡РёС‚Р°РµРј Р±Р°Р№С‚ РёР· Р±СѓС„РµСЂР°
+		if (counterUSART2Buffer == BufferUSART2Size) // РїРёС€РµРј РІ Р±СѓС„РµСЂ РїРѕ РєСЂСѓРіСѓ
 		{
 			BufferUSART2RX[counterUSART2Buffer] = TempDataUSART2;
 			counterUSART2Buffer = 0;
@@ -5450,324 +5548,318 @@ void USART2_IRQHandler(void) 	// прерывание по приему байта от BLE модуля
 		{
 			BufferUSART2RX[counterUSART2Buffer++] = TempDataUSART2;
 		}
-		BufferUSART2RX[counterUSART2Buffer] = '\0';		// после данных в буфер пишем NULL \0
+		BufferUSART2RX[counterUSART2Buffer] = '\0'; // РїРѕСЃР»Рµ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂ РїРёС€РµРј NULL \0
 
-		triggerUSART2Interrupt = 1; 					// установили флаг
+		triggerUSART2Interrupt = 1; // СѓСЃС‚Р°РЅРѕРІРёР»Рё С„Р»Р°Рі
 	}
 }
 
 /**
-  * @brief  This function handles USART3 global interrupt request.
-  * @param  None
-  * @retval None
-  * Кольцевой буфер размером NUM+1
-  * В конце данных в буфере пишется \0
-  * При наличии данных в буфере поднимается флаг triggerUSART3Interupt
-  */
-void USART3_IRQHandler(void) 	// прерывание по приему байта от GPS модуля
+ * @brief  This function handles USART3 global interrupt request.
+ * @param  None
+ * @retval None
+ * РљРѕР»СЊС†РµРІРѕР№ Р±СѓС„РµСЂ СЂР°Р·РјРµСЂРѕРј NUM+1
+ * Р’ РєРѕРЅС†Рµ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ РїРёС€РµС‚СЃСЏ \0
+ * РџСЂРё РЅР°Р»РёС‡РёРё РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂРµ РїРѕРґРЅРёРјР°РµС‚СЃСЏ С„Р»Р°Рі triggerUSART3Interupt
+ */
+void USART3_IRQHandler(void) // РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р° РѕС‚ GPS РјРѕРґСѓР»СЏ
 {
-//	u8 TempDataUSART2;
-//    if ((USART2->SR & USART_FLAG_RXNE) != (u16)RESET)	//  проверка флага прерывания RXNE - по приему байта
-//	{
-//		TempDataUSART2 = USART_ReceiveData(USART2);		// читаем байт из буфера
-//		if(counterUSART2Buffer == BufferUSART2Size)		// пишем в буфер по кругу
-//		{
-//			BufferUSART2RX[counterUSART2Buffer] = TempDataUSART2;
-//			counterUSART2Buffer = 0;
-//		}
-//		else
-//		{
-//			BufferUSART2RX[counterUSART2Buffer++] = TempDataUSART2;
-//		}
-//		BufferUSART2RX[counterUSART2Buffer] = '\0';		// после данных в буфер пишем NULL \0
-//
-//		triggerUSART2Interrupt = 1; 					// установили флаг
-//	}
+	//	u8 TempDataUSART2;
+	//    if ((USART2->SR & USART_FLAG_RXNE) != (u16)RESET)	//  РїСЂРѕРІРµСЂРєР° С„Р»Р°РіР° РїСЂРµСЂС‹РІР°РЅРёСЏ RXNE - РїРѕ РїСЂРёРµРјСѓ Р±Р°Р№С‚Р°
+	//	{
+	//		TempDataUSART2 = USART_ReceiveData(USART2);		// С‡РёС‚Р°РµРј Р±Р°Р№С‚ РёР· Р±СѓС„РµСЂР°
+	//		if(counterUSART2Buffer == BufferUSART2Size)		// РїРёС€РµРј РІ Р±СѓС„РµСЂ РїРѕ РєСЂСѓРіСѓ
+	//		{
+	//			BufferUSART2RX[counterUSART2Buffer] = TempDataUSART2;
+	//			counterUSART2Buffer = 0;
+	//		}
+	//		else
+	//		{
+	//			BufferUSART2RX[counterUSART2Buffer++] = TempDataUSART2;
+	//		}
+	//		BufferUSART2RX[counterUSART2Buffer] = '\0';		// РїРѕСЃР»Рµ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂ РїРёС€РµРј NULL \0
+	//
+	//		triggerUSART2Interrupt = 1; 					// СѓСЃС‚Р°РЅРѕРІРёР»Рё С„Р»Р°Рі
+	//	}
 
-//--------------------------------- NMEA RECEIVER ------------------------------------
-// формируем данные с 0 вместо пропущенных значений
-  volatile char UsartTemp = 0;
- // volatile char m;
+	//--------------------------------- NMEA RECEIVER ------------------------------------
+	// С„РѕСЂРјРёСЂСѓРµРј РґР°РЅРЅС‹Рµ СЃ 0 РІРјРµСЃС‚Рѕ РїСЂРѕРїСѓС‰РµРЅРЅС‹С… Р·РЅР°С‡РµРЅРёР№
+	volatile char UsartTemp = 0;
+	// volatile char m;
 
-  if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET) // проверяем флаг прерывания
-  {
-  	TIM_Cmd(TIM3, ENABLE);  // запуск таймера
-  	TIM3 -> CNT = 0;		// сброс счетчика таймера.. ждем паузы , конца посылки
-
-	UsartTemp = USART_ReceiveData(USART3);
-	GPSBuf[GPSBufWrPoint] = UsartTemp; // todo перенести заполнение нулями в парсер, после проверки CRC
-
-	if ((GPSBufWrPoint > 1) && (GPSBufWrPoint < GPSBUFLENGTH))  // Проверка нахождения внутри буфера, чтобы при дальнейшем преобразовании не выскочить за границу
+	if (USART_GetITStatus(USART3, USART_IT_RXNE) != RESET) // РїСЂРѕРІРµСЂСЏРµРј С„Р»Р°Рі РїСЂРµСЂС‹РІР°РЅРёСЏ
 	{
-	  if ((GPSBuf[GPSBufWrPoint-1] == ',') && (GPSBuf[GPSBufWrPoint] == ','))
-	  { // Принятая последовательность байт вида ",," превращается в ",0,", тем самым превращая неопределенный параметр в четкий 0
-		GPSBuf[GPSBufWrPoint]   = '0';
-		GPSBuf[GPSBufWrPoint+1] = ',';
-		GPSBufWrPoint++;
-	  }
-	  if ((GPSBuf[GPSBufWrPoint-1] == ',') && (GPSBuf[GPSBufWrPoint] == '*'))
-	  { // Принятая последовательность байт вида ",*" превращается в ",0*", тем самым превращая неопределенный параметр в четкий 0
-		GPSBuf[GPSBufWrPoint]   = '0';
-		GPSBuf[GPSBufWrPoint+1] = '*';
-		GPSBufWrPoint++;
-	  }
+		TIM_Cmd(TIM3, ENABLE); // Р·Р°РїСѓСЃРє С‚Р°Р№РјРµСЂР°
+		TIM3->CNT = 0;		   // СЃР±СЂРѕСЃ СЃС‡РµС‚С‡РёРєР° С‚Р°Р№РјРµСЂР°.. Р¶РґРµРј РїР°СѓР·С‹ , РєРѕРЅС†Р° РїРѕСЃС‹Р»РєРё
+
+		UsartTemp = USART_ReceiveData(USART3);
+		GPSBuf[GPSBufWrPoint] = UsartTemp; // todo РїРµСЂРµРЅРµСЃС‚Рё Р·Р°РїРѕР»РЅРµРЅРёРµ РЅСѓР»СЏРјРё РІ РїР°СЂСЃРµСЂ, РїРѕСЃР»Рµ РїСЂРѕРІРµСЂРєРё CRC
+
+		if ((GPSBufWrPoint > 1) && (GPSBufWrPoint < GPSBUFLENGTH)) // РџСЂРѕРІРµСЂРєР° РЅР°С…РѕР¶РґРµРЅРёСЏ РІРЅСѓС‚СЂРё Р±СѓС„РµСЂР°, С‡С‚РѕР±С‹ РїСЂРё РґР°Р»СЊРЅРµР№С€РµРј РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёРё РЅРµ РІС‹СЃРєРѕС‡РёС‚СЊ Р·Р° РіСЂР°РЅРёС†Сѓ
+		{
+			if ((GPSBuf[GPSBufWrPoint - 1] == ',') && (GPSBuf[GPSBufWrPoint] == ','))
+			{ // РџСЂРёРЅСЏС‚Р°СЏ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ Р±Р°Р№С‚ РІРёРґР° ",," РїСЂРµРІСЂР°С‰Р°РµС‚СЃСЏ РІ ",0,", С‚РµРј СЃР°РјС‹Рј РїСЂРµРІСЂР°С‰Р°СЏ РЅРµРѕРїСЂРµРґРµР»РµРЅРЅС‹Р№ РїР°СЂР°РјРµС‚СЂ РІ С‡РµС‚РєРёР№ 0
+				GPSBuf[GPSBufWrPoint] = '0';
+				GPSBuf[GPSBufWrPoint + 1] = ',';
+				GPSBufWrPoint++;
+			}
+			if ((GPSBuf[GPSBufWrPoint - 1] == ',') && (GPSBuf[GPSBufWrPoint] == '*'))
+			{ // РџСЂРёРЅСЏС‚Р°СЏ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ Р±Р°Р№С‚ РІРёРґР° ",*" РїСЂРµРІСЂР°С‰Р°РµС‚СЃСЏ РІ ",0*", С‚РµРј СЃР°РјС‹Рј РїСЂРµРІСЂР°С‰Р°СЏ РЅРµРѕРїСЂРµРґРµР»РµРЅРЅС‹Р№ РїР°СЂР°РјРµС‚СЂ РІ С‡РµС‚РєРёР№ 0
+				GPSBuf[GPSBufWrPoint] = '0';
+				GPSBuf[GPSBufWrPoint + 1] = '*';
+				GPSBufWrPoint++;
+			}
+		}
+
+		if (GPSBufWrPoint < GPSBUFLENGTH)
+			GPSBufWrPoint++; // РџСЂРѕРґРѕР»Р¶Р°РµРј Р·Р°РїРѕР»РЅСЏС‚СЊ Р±СѓС„РµСЂ
+							 //	else
+							 //	{ // Р•СЃР»Рё Р±СѓС„РµСЂ Р·Р°РїРѕР»РЅРёР»СЃСЏ, РЅР°С‡РёРЅР°РµРј РёСЃРєР°С‚СЊ Рё РґРµРєРѕРґРёСЂРѕРІР°С‚СЊ NMEA СЃРµРЅС‚РµРЅС†РёРё
+							 // printf ("\n\r GPSBufWrPoint1: %d \n\r\n\r", GPSBufWrPoint);
+							 //	  GPSBufWrPoint = 0;
+							 //	  if (NMEA_Parser_GGA() == 1) // GGA - РѕСЃРЅРѕРІРЅР°СЏ СЃРµРЅС‚РµРЅС†РёСЏ, РІС‹РґР°РµС‚ РєРѕРѕСЂРґРёРЅР°С‚С‹
+							 //	  {
+							 // printf ("\n\r NMEA_Parser_GGA = 1:\n\r");
+							 //		NMEA_Parser_ZDA();      // ZDA РІС‹РґР°РµС‚ РІСЂРµРјСЏ Рё РґР°С‚Сѓ
+							 //
+							 //		GSVStartPos = 0;
+							 //		SatNum = 0;
+							 //		if (NMEA_Parser_GSV() == 1) // GSV РІС‹РґР°РµС‚ СЃРїРёСЃРѕРє СЃРїСѓС‚РЅРёРєРѕРІ, РІРёРґРёРјС‹С… РїСЂРёРµРјРЅРёРєРѕРј. Р­С‚Сѓ РёРЅС„РѕСЂРјР°С†РёСЋ РјРѕР¶РЅРѕ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РґР»СЏ РіСЂР°С„РёС‡РµСЃРєРѕРіРѕ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ
+							 //		{
+							 //		for (m = 0; m <=6; m++) // GSV РїРѕСЃС‹Р»РєРё РїСЂРёС…РѕРґСЏС‚ РіСЂСѓРїРїР°РјРё, РїРѕС‚РѕРјСѓ С‡С‚Рѕ РІ РєР°Р¶РґСѓСЋ РїРѕСЃС‹Р»РєСѓ РІС…РѕРґРёС‚ РёРЅС„РѕСЂРјР°С†РёСЏ РјР°РєСЃРёРјСѓРј Рѕ 4-С… СЃРїСѓС‚РЅРёРєР°С…, Р° РёС… РїСЂРёРјРµСЂРЅРѕ 25
+							 //		  NMEA_Parser_GSV();
+							 //		}
+							 //	  }
+							 //	}
 	}
-
-	if (GPSBufWrPoint < GPSBUFLENGTH)
-	  GPSBufWrPoint++;  // Продолжаем заполнять буфер
-//	else
-//	{ // Если буфер заполнился, начинаем искать и декодировать NMEA сентенции
-//printf ("\n\r GPSBufWrPoint1: %d \n\r\n\r", GPSBufWrPoint);
-//	  GPSBufWrPoint = 0;
-//	  if (NMEA_Parser_GGA() == 1) // GGA - основная сентенция, выдает координаты
-//	  {
-//printf ("\n\r NMEA_Parser_GGA = 1:\n\r");
-//		NMEA_Parser_ZDA();      // ZDA выдает время и дату
-//
-//		GSVStartPos = 0;
-//		SatNum = 0;
-//		if (NMEA_Parser_GSV() == 1) // GSV выдает список спутников, видимых приемником. Эту информацию можно использовать для графического отображения
-//		{
-//		for (m = 0; m <=6; m++) // GSV посылки приходят группами, потому что в каждую посылку входит информация максимум о 4-х спутниках, а их примерно 25
-//		  NMEA_Parser_GSV();
-//		}
-//	  }
-//	}
-  }
-
-
-
 }
 
-// обработчик прерывания от Timer 1 - переполнение
+// РѕР±СЂР°Р±РѕС‚С‡РёРє РїСЂРµСЂС‹РІР°РЅРёСЏ РѕС‚ Timer 1 - РїРµСЂРµРїРѕР»РЅРµРЅРёРµ
 void TIM1_UP_IRQHandler(void)
 {
- // произошло ли прерывание по переполнению счётчика таймера TIM1.
-  if (TIM_GetITStatus(TIM1, TIM_IT_Update) != RESET)
-  {
-	/* Очищаем бит обрабатываемого прерывания */
-	TIM_ClearITPendingBit(TIM1, TIM_IT_Update); // также работает TIM_FLAG_Update
-	counter_TIM1_OVR ++ ;  						// счетчик перезагрузок таймера
+	// РїСЂРѕРёР·РѕС€Р»Рѕ Р»Рё РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM1.
+	if (TIM_GetITStatus(TIM1, TIM_IT_Update) != RESET)
+	{
+		/* РћС‡РёС‰Р°РµРј Р±РёС‚ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРјРѕРіРѕ РїСЂРµСЂС‹РІР°РЅРёСЏ */
+		TIM_ClearITPendingBit(TIM1, TIM_IT_Update); // С‚Р°РєР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ TIM_FLAG_Update
+		counter_TIM1_OVR++;							// СЃС‡РµС‚С‡РёРє РїРµСЂРµР·Р°РіСЂСѓР·РѕРє С‚Р°Р№РјРµСЂР°
 
-	if ( (counter_TIM1_OVR == 91) && (flag_1PPS_AVG_OK == 1) ) 				//
-	  {
+		if ((counter_TIM1_OVR == 91) && (flag_1PPS_AVG_OK == 1)) //
+		{
 
-	  TIM1->ARR = averageTIM4_ready;			// при следующем переполнении ARR изменится на averageTIM4_ready
-	  }
+			TIM1->ARR = averageTIM4_ready; // РїСЂРё СЃР»РµРґСѓСЋС‰РµРј РїРµСЂРµРїРѕР»РЅРµРЅРёРё ARR РёР·РјРµРЅРёС‚СЃСЏ РЅР° averageTIM4_ready
+		}
 
-	if ( counter_TIM1_OVR == 92 ) 				// сюда попадаем только если нет сигнала 1PPS, при автономной работе
-	  {
-//OnLED0();
-		counter_TIM1_OVR = 0;
-	    TIM1->ARR = 0xFFFF;			// при следующем переполнении ARR изменится на 0xFFFF
-	    flag_1PPS_pulse = 1;		// импульс 1PPS от таймера 1
-	    SecRTC ++;					// прибавили секунду
-//OffLED0();
-	  }
-  }
+		if (counter_TIM1_OVR == 92) // СЃСЋРґР° РїРѕРїР°РґР°РµРј С‚РѕР»СЊРєРѕ РµСЃР»Рё РЅРµС‚ СЃРёРіРЅР°Р»Р° 1PPS, РїСЂРё Р°РІС‚РѕРЅРѕРјРЅРѕР№ СЂР°Р±РѕС‚Рµ
+		{
+			// OnLED0();
+			counter_TIM1_OVR = 0;
+			TIM1->ARR = 0xFFFF;	 // РїСЂРё СЃР»РµРґСѓСЋС‰РµРј РїРµСЂРµРїРѕР»РЅРµРЅРёРё ARR РёР·РјРµРЅРёС‚СЃСЏ РЅР° 0xFFFF
+			flag_1PPS_pulse = 1; // РёРјРїСѓР»СЊСЃ 1PPS РѕС‚ С‚Р°Р№РјРµСЂР° 1
+			SecRTC++;			 // РїСЂРёР±Р°РІРёР»Рё СЃРµРєСѓРЅРґСѓ
+								 // OffLED0();
+		}
+	}
 }
 
-// обработчик прерывания Timer2 - пришла посылка от BLE модуля
+// РѕР±СЂР°Р±РѕС‚С‡РёРє РїСЂРµСЂС‹РІР°РЅРёСЏ Timer2 - РїСЂРёС€Р»Р° РїРѕСЃС‹Р»РєР° РѕС‚ BLE РјРѕРґСѓР»СЏ
 void TIM2_IRQHandler()
 {
- // произошло ли прерывание по переполнению счётчика таймера TIM2.
-  if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)
-  {
-	/* Очищаем бит обрабатываемого прерывания */
-	TIM_ClearITPendingBit(TIM2, TIM_IT_Update); // также работает TIM_FLAG_Update
-	triggerTIM2Interrupt = 1; 					// установили флаг, принята посылка от BLE модуля
-	counterUSART2Buffer = 0;					// сбросили счетчик байт USART буфера
-  }
+	// РїСЂРѕРёР·РѕС€Р»Рѕ Р»Рё РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM2.
+	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)
+	{
+		/* РћС‡РёС‰Р°РµРј Р±РёС‚ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРјРѕРіРѕ РїСЂРµСЂС‹РІР°РЅРёСЏ */
+		TIM_ClearITPendingBit(TIM2, TIM_IT_Update); // С‚Р°РєР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ TIM_FLAG_Update
+		triggerTIM2Interrupt = 1;					// СѓСЃС‚Р°РЅРѕРІРёР»Рё С„Р»Р°Рі, РїСЂРёРЅСЏС‚Р° РїРѕСЃС‹Р»РєР° РѕС‚ BLE РјРѕРґСѓР»СЏ
+		counterUSART2Buffer = 0;					// СЃР±СЂРѕСЃРёР»Рё СЃС‡РµС‚С‡РёРє Р±Р°Р№С‚ USART Р±СѓС„РµСЂР°
+	}
 }
 
-// обработчик прерывания Timer3 - пришла посылка от GPS модуля
+// РѕР±СЂР°Р±РѕС‚С‡РёРє РїСЂРµСЂС‹РІР°РЅРёСЏ Timer3 - РїСЂРёС€Р»Р° РїРѕСЃС‹Р»РєР° РѕС‚ GPS РјРѕРґСѓР»СЏ
 void TIM3_IRQHandler()
 {
-// произошло ли прерывание по переполнению счётчика таймера TIM3.
-  if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
-  {
-    /* Очищаем бит обрабатываемого прерывания */
-    TIM_ClearITPendingBit(TIM3, TIM_IT_Update); // также работает TIM_FLAG_Update
-    triggerTIM3Interrupt = 1; 					// установили флаг, принята посылка от GPS модуля
-  }
-}
-
-// обработчик прерывания Timer4
-void TIM4_IRQHandler() // счетчик переполняется каждые 10,92 мс, за 1 секунду досчитает до 91
-{
-// произошло ли прерывание по переполнению счётчика таймера TIM4.
-  if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)
-  {
-	  /* Очищаем бит обрабатываемого прерывания */
-	  TIM_ClearITPendingBit(TIM4, TIM_IT_Update); // также работает TIM_FLAG_Update
-
-//CplLED0(); // todo
-
-	  counter_TIM4_OVR ++ ;  		// счетчик перезагрузок таймера
-	  if ( counter_TIM4_OVR >= 92 ) // сброс счетчиков при большой паузе между импульсами 1PPS
-		  {
-		  counter_TIM4_OVR = 0;
-		  counter_TIM4_fix = 0;
-		  TIM4_fix = 0;
-		  flag_1PPS_timeout = 1;
-		  flag_1PPS_fail = 1;
-		  }
-
-  }
-}
-
-// прерывание от переднего фронта 1PPS
-void EXTI15_10_IRQHandler (void) // обработчик прерываний от портов 10-15
-{
-	if (EXTI_GetITStatus(EXTI_Line12))			// проверка флага прерывания
+	// РїСЂРѕРёР·РѕС€Р»Рѕ Р»Рё РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM3.
+	if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
 	{
-//OnLED0();
-		EXTI_ClearITPendingBit (EXTI_Line12); 	// сброс флага прерывания
+		/* РћС‡РёС‰Р°РµРј Р±РёС‚ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРјРѕРіРѕ РїСЂРµСЂС‹РІР°РЅРёСЏ */
+		TIM_ClearITPendingBit(TIM3, TIM_IT_Update); // С‚Р°РєР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ TIM_FLAG_Update
+		triggerTIM3Interrupt = 1;					// СѓСЃС‚Р°РЅРѕРІРёР»Рё С„Р»Р°Рі, РїСЂРёРЅСЏС‚Р° РїРѕСЃС‹Р»РєР° РѕС‚ GPS РјРѕРґСѓР»СЏ
+	}
+}
 
-		TIM4_fix = TIM4->CNT; 						// фиксируем значение таймера
-		counter_TIM4_fix = counter_TIM4_OVR; 		// фиксируем значение счетчика циклов таймера
+// РѕР±СЂР°Р±РѕС‚С‡РёРє РїСЂРµСЂС‹РІР°РЅРёСЏ Timer4
+void TIM4_IRQHandler() // СЃС‡РµС‚С‡РёРє РїРµСЂРµРїРѕР»РЅСЏРµС‚СЃСЏ РєР°Р¶РґС‹Рµ 10,92 РјСЃ, Р·Р° 1 СЃРµРєСѓРЅРґСѓ РґРѕСЃС‡РёС‚Р°РµС‚ РґРѕ 91
+{
+	// РїСЂРѕРёР·РѕС€Р»Рѕ Р»Рё РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёСЋ СЃС‡С‘С‚С‡РёРєР° С‚Р°Р№РјРµСЂР° TIM4.
+	if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)
+	{
+		/* РћС‡РёС‰Р°РµРј Р±РёС‚ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРјРѕРіРѕ РїСЂРµСЂС‹РІР°РЅРёСЏ */
+		TIM_ClearITPendingBit(TIM4, TIM_IT_Update); // С‚Р°РєР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ TIM_FLAG_Update
 
-		TIM4->CNT = 0; 				// сброс таймера
-		counter_TIM4_OVR = 0; 		// сброс счетчика
+		// CplLED0(); // todo
 
-		flag_1PPS_Update = 1; 		// обновилось значение 1PPS
-		flag_1PPS_pulse = 1;		// импульс пришел
-
-		// -- СИНХРОНИЗАЦИЯ таймера1 ----
-		if (flag_1PPS_AVG_OK == 1)		// если после сброса среднее значение периода 1PPS уже получено хотябы один раз
+		counter_TIM4_OVR++;			// СЃС‡РµС‚С‡РёРє РїРµСЂРµР·Р°РіСЂСѓР·РѕРє С‚Р°Р№РјРµСЂР°
+		if (counter_TIM4_OVR >= 92) // СЃР±СЂРѕСЃ СЃС‡РµС‚С‡РёРєРѕРІ РїСЂРё Р±РѕР»СЊС€РѕР№ РїР°СѓР·Рµ РјРµР¶РґСѓ РёРјРїСѓР»СЊСЃР°РјРё 1PPS
 		{
-			TIM_Cmd(TIM1, DISABLE);  	// стоп таймера todo уточнить нужно ли
-			TIM1->CNT = 0; 				// сброс таймера
-			TIM1->ARR = 0xFFFF;			// при следующем переполнении ARR изменится на 0xFFFF
-			counter_TIM1_OVR = 0;
-			TIM_ClearITPendingBit(TIM1, TIM_FLAG_Update); 	// также работает TIM_FLAG_Update
-			TIM_Cmd(TIM1, ENABLE);  	// запуск таймера
-			//
-			SecRTC = GPSTimeSec + 1;	// текущая секунда таймера равна секунде GPS + 1
+			counter_TIM4_OVR = 0;
+			counter_TIM4_fix = 0;
+			TIM4_fix = 0;
+			flag_1PPS_timeout = 1;
+			flag_1PPS_fail = 1;
 		}
-//OffLED0();
+	}
+}
+
+// РїСЂРµСЂС‹РІР°РЅРёРµ РѕС‚ РїРµСЂРµРґРЅРµРіРѕ С„СЂРѕРЅС‚Р° 1PPS
+void EXTI15_10_IRQHandler(void) // РѕР±СЂР°Р±РѕС‚С‡РёРє РїСЂРµСЂС‹РІР°РЅРёР№ РѕС‚ РїРѕСЂС‚РѕРІ 10-15
+{
+	if (EXTI_GetITStatus(EXTI_Line12)) // РїСЂРѕРІРµСЂРєР° С„Р»Р°РіР° РїСЂРµСЂС‹РІР°РЅРёСЏ
+	{
+		// OnLED0();
+		EXTI_ClearITPendingBit(EXTI_Line12); // СЃР±СЂРѕСЃ С„Р»Р°РіР° РїСЂРµСЂС‹РІР°РЅРёСЏ
+
+		TIM4_fix = TIM4->CNT;				 // С„РёРєСЃРёСЂСѓРµРј Р·РЅР°С‡РµРЅРёРµ С‚Р°Р№РјРµСЂР°
+		counter_TIM4_fix = counter_TIM4_OVR; // С„РёРєСЃРёСЂСѓРµРј Р·РЅР°С‡РµРЅРёРµ СЃС‡РµС‚С‡РёРєР° С†РёРєР»РѕРІ С‚Р°Р№РјРµСЂР°
+
+		TIM4->CNT = 0;		  // СЃР±СЂРѕСЃ С‚Р°Р№РјРµСЂР°
+		counter_TIM4_OVR = 0; // СЃР±СЂРѕСЃ СЃС‡РµС‚С‡РёРєР°
+
+		flag_1PPS_Update = 1; // РѕР±РЅРѕРІРёР»РѕСЃСЊ Р·РЅР°С‡РµРЅРёРµ 1PPS
+		flag_1PPS_pulse = 1;  // РёРјРїСѓР»СЊСЃ РїСЂРёС€РµР»
+
+		// -- РЎРРќРҐР РћРќРР—РђР¦РРЇ С‚Р°Р№РјРµСЂР°1 ----
+		if (flag_1PPS_AVG_OK == 1) // РµСЃР»Рё РїРѕСЃР»Рµ СЃР±СЂРѕСЃР° СЃСЂРµРґРЅРµРµ Р·РЅР°С‡РµРЅРёРµ РїРµСЂРёРѕРґР° 1PPS СѓР¶Рµ РїРѕР»СѓС‡РµРЅРѕ С…РѕС‚СЏР±С‹ РѕРґРёРЅ СЂР°Р·
+		{
+			TIM_Cmd(TIM1, DISABLE); // СЃС‚РѕРї С‚Р°Р№РјРµСЂР° todo СѓС‚РѕС‡РЅРёС‚СЊ РЅСѓР¶РЅРѕ Р»Рё
+			TIM1->CNT = 0;			// СЃР±СЂРѕСЃ С‚Р°Р№РјРµСЂР°
+			TIM1->ARR = 0xFFFF;		// РїСЂРё СЃР»РµРґСѓСЋС‰РµРј РїРµСЂРµРїРѕР»РЅРµРЅРёРё ARR РёР·РјРµРЅРёС‚СЃСЏ РЅР° 0xFFFF
+			counter_TIM1_OVR = 0;
+			TIM_ClearITPendingBit(TIM1, TIM_FLAG_Update); // С‚Р°РєР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ TIM_FLAG_Update
+			TIM_Cmd(TIM1, ENABLE);						  // Р·Р°РїСѓСЃРє С‚Р°Р№РјРµСЂР°
+			//
+			SecRTC = GPSTimeSec + 1; // С‚РµРєСѓС‰Р°СЏ СЃРµРєСѓРЅРґР° С‚Р°Р№РјРµСЂР° СЂР°РІРЅР° СЃРµРєСѓРЅРґРµ GPS + 1
+		}
+		// OffLED0();
 	}
 }
 
 void I2C1_EV_IRQHandler(void)
 {
-	__IO uint32_t SR1Register =0;
-	__IO uint32_t SR2Register =0;
+	__IO uint32_t SR1Register = 0;
+	__IO uint32_t SR2Register = 0;
 
-OnLED1();
+	OnLED1();
 
-    /* Read the I2C1 SR1 and SR2 status registers */
-	// прочитали два регистра SR1 и SR2
-    SR1Register = I2C1->SR1;
-    SR2Register = I2C1->SR2;
+	/* Read the I2C1 SR1 and SR2 status registers */
+	// РїСЂРѕС‡РёС‚Р°Р»Рё РґРІР° СЂРµРіРёСЃС‚СЂР° SR1 Рё SR2
+	SR1Register = I2C1->SR1;
+	SR2Register = I2C1->SR2;
 
-    /* If SB = 1, I2C1 master sent a START on the bus: EV5) */
-    // прерывание по событию START от мастера
-    if ((SR1Register &0x0001) == 0x0001)
-    {
-        /* Send the slave address for transmssion or for reception (according to the configured value
-            in the write master write routine */
-        I2C1->DR = Address;	// посылаем адрес устройства 		extern uint8_t Address
-        SR1Register = 0;	// сбрасываем переменные регистров статуса I2C
-        SR2Register = 0;
-    }
-    /* If I2C1 is Master (MSL flag = 1) */
-    // передаем данные
-    if ((SR2Register &0x0001) == 0x0001)
-    {
-        /* If ADDR = 1, EV6 */  // адрес уже послан, отправляем первый байт данных
-        if ((SR1Register &0x0002) == 0x0002)
-        {
-            /* Write the first data in case the Master is Transmitter */
+	/* If SB = 1, I2C1 master sent a START on the bus: EV5) */
+	// РїСЂРµСЂС‹РІР°РЅРёРµ РїРѕ СЃРѕР±С‹С‚РёСЋ START РѕС‚ РјР°СЃС‚РµСЂР°
+	if ((SR1Register & 0x0001) == 0x0001)
+	{
+		/* Send the slave address for transmssion or for reception (according to the configured value
+			in the write master write routine */
+		I2C1->DR = Address; // РїРѕСЃС‹Р»Р°РµРј Р°РґСЂРµСЃ СѓСЃС‚СЂРѕР№СЃС‚РІР° 		extern uint8_t Address
+		SR1Register = 0;	// СЃР±СЂР°СЃС‹РІР°РµРј РїРµСЂРµРјРµРЅРЅС‹Рµ СЂРµРіРёСЃС‚СЂРѕРІ СЃС‚Р°С‚СѓСЃР° I2C
+		SR2Register = 0;
+	}
+	/* If I2C1 is Master (MSL flag = 1) */
+	// РїРµСЂРµРґР°РµРј РґР°РЅРЅС‹Рµ
+	if ((SR2Register & 0x0001) == 0x0001)
+	{
+		/* If ADDR = 1, EV6 */ // Р°РґСЂРµСЃ СѓР¶Рµ РїРѕСЃР»Р°РЅ, РѕС‚РїСЂР°РІР»СЏРµРј РїРµСЂРІС‹Р№ Р±Р°Р№С‚ РґР°РЅРЅС‹С…
+		if ((SR1Register & 0x0002) == 0x0002)
+		{
+			/* Write the first data in case the Master is Transmitter */
 
 			/* Initialize the Transmit counter */
-			Tx_Idx1 = 0;  						//__IO uint8_t
+			Tx_Idx1 = 0; //__IO uint8_t
 			/* Write the first data in the data register */
 			I2C1->DR = Buffer_Tx1[Tx_Idx1++];
 			/* Decrement the number of bytes to be written */
-			NumbOfBytes1--;						// extern __IO uint32_t NumbOfBytes1;
+			NumbOfBytes1--; // extern __IO uint32_t NumbOfBytes1;
 			/* If no further data to be sent, disable the I2C BUF IT
 			in order to not have a TxE  interrupt */
-			if (NumbOfBytes1 == 0) // если все данные переданы - отключаем прерывание I2C_IT_BUF
+			if (NumbOfBytes1 == 0) // РµСЃР»Рё РІСЃРµ РґР°РЅРЅС‹Рµ РїРµСЂРµРґР°РЅС‹ - РѕС‚РєР»СЋС‡Р°РµРј РїСЂРµСЂС‹РІР°РЅРёРµ I2C_IT_BUF
 			{
 				I2C1->CR2 &= (uint16_t)~I2C_IT_BUF;
 			}
-            SR1Register = 0;
-            SR2Register = 0;
-        }
-        /* Master transmits the remaing data: from data2 until the last one.  */
-        /* If TXE is set */ // остальные байты из массива для передачи
-        if ((SR1Register &0x0084) == 0x0080)
-        {
-            /* If there is still data to write */
-            if (NumbOfBytes1!=0)
-            {
-                /* Write the data in DR register */
-                I2C1->DR = Buffer_Tx1[Tx_Idx1++]; // extern uint8_t Buffer_Tx1[]
-                /* Decrement the number of data to be written */
-                NumbOfBytes1--;
-                /* If  no data remains to write, disable the BUF IT in order
-                to not have again a TxE interrupt. */
-                if (NumbOfBytes1 == 0)
-                {
-                    /* Disable the BUF IT */
-                    I2C1->CR2 &= (uint16_t)~I2C_IT_BUF;
-                }
-            }
-            SR1Register = 0;
-            SR2Register = 0;
-        }
-        /* If BTF and TXE are set (EV8_2), program the STOP */
-        // формируем STOP
-        if ((SR1Register &0x0084) == 0x0084)
-        {
-            /* Program the STOP */
-            I2C1->CR1 |= I2C_CR1_STOP; //0x0200 ; //
-            /* Disable EVT IT In order to not have again a BTF IT */
-            I2C1->CR2 &= (uint16_t)~I2C_IT_EVT;
-            SR1Register = 0;
-            SR2Register = 0;
-        }
+			SR1Register = 0;
+			SR2Register = 0;
+		}
+		/* Master transmits the remaing data: from data2 until the last one.  */
+		/* If TXE is set */ // РѕСЃС‚Р°Р»СЊРЅС‹Рµ Р±Р°Р№С‚С‹ РёР· РјР°СЃСЃРёРІР° РґР»СЏ РїРµСЂРµРґР°С‡Рё
+		if ((SR1Register & 0x0084) == 0x0080)
+		{
+			/* If there is still data to write */
+			if (NumbOfBytes1 != 0)
+			{
+				/* Write the data in DR register */
+				I2C1->DR = Buffer_Tx1[Tx_Idx1++]; // extern uint8_t Buffer_Tx1[]
+				/* Decrement the number of data to be written */
+				NumbOfBytes1--;
+				/* If  no data remains to write, disable the BUF IT in order
+				to not have again a TxE interrupt. */
+				if (NumbOfBytes1 == 0)
+				{
+					/* Disable the BUF IT */
+					I2C1->CR2 &= (uint16_t)~I2C_IT_BUF;
+				}
+			}
+			SR1Register = 0;
+			SR2Register = 0;
+		}
+		/* If BTF and TXE are set (EV8_2), program the STOP */
+		// С„РѕСЂРјРёСЂСѓРµРј STOP
+		if ((SR1Register & 0x0084) == 0x0084)
+		{
+			/* Program the STOP */
+			I2C1->CR1 |= I2C_CR1_STOP; // 0x0200 ; //
+			/* Disable EVT IT In order to not have again a BTF IT */
+			I2C1->CR2 &= (uint16_t)~I2C_IT_EVT;
+			SR1Register = 0;
+			SR2Register = 0;
+		}
+	}
 
-
-    }
-
-OffLED1();
+	OffLED1();
 }
 
-void I2C1_ER_IRQHandler(void)	// обработчик прерывания по ошибке I2C
+void I2C1_ER_IRQHandler(void) // РѕР±СЂР°Р±РѕС‚С‡РёРє РїСЂРµСЂС‹РІР°РЅРёСЏ РїРѕ РѕС€РёР±РєРµ I2C
 {
-    __IO uint32_t SR1Register =0;
+	__IO uint32_t SR1Register = 0;
 
-OnLED0();
-//OnLED1();
+	OnLED0();
+	// OnLED1();
 
-    /* Read the I2C1 status register */
-    SR1Register = I2C1->SR1;
-    /* If AF = 1 */
-    if ((SR1Register & 0x0400) == 0x0400)
-    {
-        I2C1->SR1 &= 0xFBFF;
-        SR1Register = 0;
-    }
-    /* If ARLO = 1 */
-    if ((SR1Register & 0x0200) == 0x0200)
-    {
-        I2C1->SR1 &= 0xFBFF;
-        SR1Register = 0;
-    }
-    /* If BERR = 1 */
-    if ((SR1Register & 0x0100) == 0x0100)
-    {
-        I2C1->SR1 &= 0xFEFF;
-        SR1Register = 0;
-    }
+	/* Read the I2C1 status register */
+	SR1Register = I2C1->SR1;
+	/* If AF = 1 */
+	if ((SR1Register & 0x0400) == 0x0400)
+	{
+		I2C1->SR1 &= 0xFBFF;
+		SR1Register = 0;
+	}
+	/* If ARLO = 1 */
+	if ((SR1Register & 0x0200) == 0x0200)
+	{
+		I2C1->SR1 &= 0xFBFF;
+		SR1Register = 0;
+	}
+	/* If BERR = 1 */
+	if ((SR1Register & 0x0100) == 0x0100)
+	{
+		I2C1->SR1 &= 0xFEFF;
+		SR1Register = 0;
+	}
 
-    /* If OVR = 1 */
+	/* If OVR = 1 */
 
-    if ((SR1Register & 0x0800) == 0x0800)
-    {
-        I2C1->SR1 &= 0xF7FF;
-        SR1Register = 0;
-    }
+	if ((SR1Register & 0x0800) == 0x0800)
+	{
+		I2C1->SR1 &= 0xF7FF;
+		SR1Register = 0;
+	}
 }
