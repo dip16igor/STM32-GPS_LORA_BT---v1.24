@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<history>
+   <processor signature="4.9.3 -mcpu=cortex-m3 -mthumb -g -nostartfiles -Map=STM32.map -Os --gc-sections -LC:\CooCox\CoIDE\configuration\ProgramData\STM32 -TC:\CooCox\CoIDE\configuration\ProgramData\STM32/arm-gcc-link.ld -g -L..\..\.. -lm">
+      <target file="STM32.elf" lastModified="165ba056f16">
+         <source file="..\obj\stm32f10x_rtc.o" lastModified="165b7b472da"/>
+         <source file="..\obj\sx1276.o" lastModified="165b7b47348"/>
+         <source file="..\obj\stm32f10x_tim.o" lastModified="165b7b474c0"/>
+         <source file="..\obj\system_stm32f10x.o" lastModified="165b7b4751e"/>
+         <source file="..\obj\sx1276-Fsk.o" lastModified="165b7b47605"/>
+         <source file="..\obj\sx1276-LoRa.o" lastModified="165b7b476cb"/>
+         <source file="..\obj\startup_stm32f10x_md.o" lastModified="165b7b47710"/>
+         <source file="..\obj\stm32f10x_gpio.o" lastModified="165b7b47792"/>
+         <source file="..\obj\main.o" lastModified="165ba056d15"/>
+         <source file="..\obj\sx1276-Hal.o" lastModified="165b7b48434"/>
+         <source file="..\obj\printf.o" lastModified="165b7b484dd"/>
+         <source file="..\obj\stm32f10x_rcc.o" lastModified="165b7b48574"/>
+         <source file="..\obj\radio.o" lastModified="165b7b485b0"/>
+         <source file="..\obj\stm32f10x_exti.o" lastModified="165b7b4860f"/>
+         <source file="..\obj\sx1276-FskMisc.o" lastModified="165b7b486f7"/>
+         <source file="..\obj\stm32f10x_adc.o" lastModified="165b7b4879f"/>
+         <source file="..\obj\fonts.o" lastModified="165b7b48815"/>
+         <source file="..\obj\stm32f10x_usart.o" lastModified="165b7b488b6"/>
+         <source file="..\obj\stm32f10x_flash.o" lastModified="165b7b48967"/>
+         <source file="..\obj\ssd1306_i2c.o" lastModified="165b7b489db"/>
+         <source file="..\obj\stm32f10x_dma.o" lastModified="165b7b48a4b"/>
+         <source file="..\obj\sx1276-LoRaMisc.o" lastModified="165b7b48b05"/>
+         <source file="..\obj\misc.o" lastModified="165b7b48b60"/>
+         <source file="..\obj\ssd1306.o" lastModified="165b7b48ced"/>
+         <source file="..\obj\stm32f10x_spi.o" lastModified="165b7b48d82"/>
+         <source file="..\obj\stm32f10x_i2c.o" lastModified="165b7b48e31"/>
+      </target>
+   </processor>
+</history>

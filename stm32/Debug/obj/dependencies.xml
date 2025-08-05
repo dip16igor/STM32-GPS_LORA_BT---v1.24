@@ -1,0 +1,204 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<dependencies>
+   <includePath signature="/I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\OLED SSD1306 /I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\LORA /I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\stm_lib /I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\cmsis_boot /I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\stm_lib\inc /I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\cmsis /I..\..\..\..\..\Dropbox\workspace C ARM /I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24">
+      <source file="..\..\..\cmsis\core_cm3.h" lastModified="165993ea058">
+         <include file="..\..\..\cmsis\core_cmInstr.h"/>
+         <include file="..\..\..\cmsis\core_cmFunc.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_i2c.c" lastModified="165993c0078">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_i2c.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_spi.c" lastModified="165993bd580">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_spi.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_rtc.h" lastModified="165993c5a50">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\OLED SSD1306\ssd1306_i2c.h" lastModified="165993cd750">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_i2c.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_gpio.h"/>
+      </source>
+      <source file="..\..\..\OLED SSD1306\fonts.h" lastModified="165993d0e00">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_rcc.h" lastModified="165993c6608">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_exti.c" lastModified="165993c17e8">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_exti.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_gpio.c" lastModified="165993c0848">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_gpio.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+      </source>
+      <source file="..\..\..\OLED SSD1306\ssd1306_i2c.c" lastModified="165993cdf20">
+         <include file="..\..\..\OLED SSD1306\ssd1306_i2c.h"/>
+      </source>
+      <source file="..\..\..\OLED SSD1306\fonts.c" lastModified="165993d15d0">
+         <include file="..\..\..\OLED SSD1306\fonts.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_adc.h" lastModified="165993cb040">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\LORA\sx1276.h" lastModified="165993d2570">
+      </source>
+      <source file="..\..\..\cmsis_boot\system_stm32f10x.h" lastModified="165993e2740">
+      </source>
+      <source file="..\..\..\LORA\sx1276.c" lastModified="165993d2570">
+         <include file="..\..\..\LORA\platform.h"/>
+         <include file="..\..\..\LORA\radio.h"/>
+         <include file="..\..\..\LORA\sx1276.h"/>
+         <include file="..\..\..\LORA\sx1276-Hal.h"/>
+         <include file="..\..\..\LORA\sx1276-Fsk.h"/>
+         <include file="..\..\..\LORA\sx1276-LoRa.h"/>
+      </source>
+      <source file="..\..\..\cmsis_boot\system_stm32f10x.c" lastModified="165993e32f8">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_dma.h" lastModified="165993ca488">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\cmsis_boot\stm32f10x_conf.h" lastModified="165993e6d90">
+      </source>
+      <source file="..\..\..\stm_lib\src\misc.c" lastModified="165993c3b10">
+         <include file="..\..\..\stm_lib\inc\misc.h"/>
+      </source>
+      <source file="..\..\..\cmsis\core_cmFunc.h" lastModified="165993e9888">
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_usart.h" lastModified="165993c42e0">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\LORA\ioe.h" lastModified="165993da658">
+      </source>
+      <source file="..\..\..\cmsis_boot\startup\startup_stm32f10x_md.c" lastModified="165993cc7b0">
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_tim.c" lastModified="165993aaca0">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_tim.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_usart.c" lastModified="165993aa0e8">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_usart.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_i2c.h" lastModified="165993c6dd8">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_spi.h" lastModified="165993c5280">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_flash.h" lastModified="165993c8930">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\stdio\printf.c" lastModified="165993cd750">
+      </source>
+      <source file="..\..\..\stm_lib\inc\misc.h" lastModified="165993cb810">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\LORA\sx1276-Hal.h" lastModified="165993d5c20">
+         <include file="..\..\..\LORA\ioe.h"/>
+      </source>
+      <source file="..\..\..\cmsis\core_cmInstr.h" lastModified="165993e90b8">
+      </source>
+      <source file="..\..\..\LORA\sx1276-Hal.c" lastModified="165993d67d8">
+         <include file="..\..\..\LORA\platform.h"/>
+         <include file="..\..\..\LORA\ioe.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_gpio.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_spi.h"/>
+         <include file="..\..\..\LORA\sx1276-Hal.h"/>
+      </source>
+      <source file="..\..\..\LORA\sx1276-Fsk.h" lastModified="165993d7b60">
+      </source>
+      <source file="..\..\..\LORA\sx1276-FskMisc.h" lastModified="165993d67d8">
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_flash.c" lastModified="165993c1018">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_flash.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_rtc.c" lastModified="165993becf0">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rtc.h"/>
+      </source>
+      <source file="..\..\..\LORA\sx1276-FskMisc.c" lastModified="165993d7390">
+         <include file="..\..\..\LORA\platform.h"/>
+         <include file="..\..\..\LORA\sx1276-Hal.h"/>
+         <include file="..\..\..\LORA\sx1276.h"/>
+         <include file="..\..\..\LORA\sx1276-Fsk.h"/>
+         <include file="..\..\..\LORA\sx1276-FskMisc.h"/>
+      </source>
+      <source file="..\..\..\LORA\sx1276-Fsk.c" lastModified="165993d8ee8">
+         <include file="..\..\..\LORA\platform.h"/>
+         <include file="..\..\..\LORA\radio.h"/>
+         <include file="..\..\..\LORA\sx1276-Hal.h"/>
+         <include file="..\..\..\LORA\sx1276.h"/>
+         <include file="..\..\..\LORA\sx1276-FskMisc.h"/>
+         <include file="..\..\..\LORA\sx1276-Fsk.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_rcc.c" lastModified="165993bf8a8">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+      </source>
+      <source file="..\..\..\cmsis_boot\stm32f10x.h" lastModified="165993e8500">
+         <include file="..\..\..\cmsis\core_cm3.h"/>
+         <include file="..\..\..\cmsis_boot\system_stm32f10x.h"/>
+         <include file="..\..\..\cmsis_boot\stm32f10x_conf.h"/>
+      </source>
+      <source file="..\..\..\LORA\sx1276-LoRaMisc.h" lastModified="165993d2d40">
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_adc.c" lastModified="165993c3340">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_adc.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+      </source>
+      <source file="..\..\..\LORA\sx1276-LoRaMisc.c" lastModified="165993d3510">
+         <include file="..\..\..\LORA\platform.h"/>
+         <include file="..\..\..\LORA\sx1276-Hal.h"/>
+         <include file="..\..\..\LORA\sx1276.h"/>
+         <include file="..\..\..\LORA\sx1276-LoRa.h"/>
+         <include file="..\..\..\LORA\sx1276-LoRaMisc.h"/>
+      </source>
+      <source file="..\..\..\OLED SSD1306\ssd1306.h" lastModified="165993cfe60">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+         <include file="..\..\..\OLED SSD1306\ssd1306_i2c.h"/>
+         <include file="..\..\..\OLED SSD1306\fonts.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+      </source>
+      <source file="..\..\..\LORA\radio.h" lastModified="165993d92d0">
+      </source>
+      <source file="..\..\..\LORA\platform.h" lastModified="165993d9e88">
+      </source>
+      <source file="..\..\..\LORA\radio.c" lastModified="165993d9e88">
+         <include file="..\..\..\LORA\platform.h"/>
+         <include file="..\..\..\LORA\radio.h"/>
+         <include file="..\..\..\LORA\sx1276.h"/>
+      </source>
+      <source file="..\..\..\OLED SSD1306\ssd1306.c" lastModified="165993d0248">
+         <include file="..\..\..\OLED SSD1306\ssd1306.h"/>
+         <include file="..\..\..\OLED SSD1306\ssd1306_i2c.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_dma.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\src\stm32f10x_dma.c" lastModified="165993c23a0">
+         <include file="..\..\..\stm_lib\inc\stm32f10x_dma.h"/>
+         <include file="..\..\..\stm_lib\inc\stm32f10x_rcc.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_exti.h" lastModified="165993c98d0">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_gpio.h" lastModified="165993c7990">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\stm_lib\inc\stm32f10x_tim.h" lastModified="165993c4ab0">
+         <include file="..\..\..\cmsis_boot\stm32f10x.h"/>
+      </source>
+      <source file="..\..\..\LORA\sx1276-LoRa.h" lastModified="165993d3ce0">
+      </source>
+      <source file="..\..\..\LORA\sx1276-LoRa.c" lastModified="165993d5450">
+         <include file="..\..\..\LORA\platform.h"/>
+         <include file="..\..\..\LORA\radio.h"/>
+         <include file="..\..\..\LORA\sx1276-Hal.h"/>
+         <include file="..\..\..\LORA\sx1276.h"/>
+         <include file="..\..\..\LORA\sx1276-LoRaMisc.h"/>
+         <include file="..\..\..\LORA\sx1276-LoRa.h"/>
+      </source>
+   </includePath>
+</dependencies>

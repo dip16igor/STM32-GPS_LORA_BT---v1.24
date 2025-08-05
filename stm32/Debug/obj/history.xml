@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<history>
+   <processor signature="arm-none-eabi-gcc noversion nomachine -mcpu=cortex-m3 -mthumb -Wall -ffunction-sections -g -Os -c -DSTM32F103C8 -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER -D__ASSEMBLY__ -I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\OLED SSD1306 -I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\LORA -I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\stm_lib -I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\cmsis_boot -I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\stm_lib\inc -I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24\cmsis -I..\..\..\..\..\Dropbox\workspace C ARM -I..\..\..\..\..\Dropbox\workspace C ARM\_STM32 GPS_LORA_BT - v1.24">
+      <target file="radio.o" lastModified="165b7b485b0">
+         <source file="..\..\..\LORA\radio.c" lastModified="165993d96b8"/>
+      </target>
+      <target file="stm32f10x_spi.o" lastModified="165b7b48d82">
+         <source file="..\..\..\stm_lib\src\stm32f10x_spi.c" lastModified="165993bd580"/>
+      </target>
+      <target file="fonts.o" lastModified="165b7b48815">
+         <source file="..\..\..\OLED SSD1306\fonts.c" lastModified="165993d15d0"/>
+      </target>
+      <target file="sx1276-FskMisc.o" lastModified="165b7b486f7">
+         <source file="..\..\..\LORA\sx1276-FskMisc.c" lastModified="165993d6fa8"/>
+      </target>
+      <target file="sx1276.o" lastModified="165b7b47348">
+         <source file="..\..\..\LORA\sx1276.c" lastModified="165993d2570"/>
+      </target>
+      <target file="stm32f10x_rcc.o" lastModified="165b7b48574">
+         <source file="..\..\..\stm_lib\src\stm32f10x_rcc.c" lastModified="165993bf8a8"/>
+      </target>
+      <target file="sx1276-LoRa.o" lastModified="165b7b476cb">
+         <source file="..\..\..\LORA\sx1276-LoRa.c" lastModified="165993d5068"/>
+      </target>
+      <target file="sx1276-LoRaMisc.o" lastModified="165b7b48b05">
+         <source file="..\..\..\LORA\sx1276-LoRaMisc.c" lastModified="165993d3510"/>
+      </target>
+      <target file="printf.o" lastModified="165b7b484dd">
+         <source file="..\..\..\stdio\printf.c" lastModified="165993ccf80"/>
+      </target>
+      <target file="stm32f10x_i2c.o" lastModified="165b7b48e31">
+         <source file="..\..\..\stm_lib\src\stm32f10x_i2c.c" lastModified="165993c0078"/>
+      </target>
+      <target file="ssd1306.o" lastModified="165b7b48ced">
+         <source file="..\..\..\OLED SSD1306\ssd1306.c" lastModified="165993d0248"/>
+      </target>
+      <target file="misc.o" lastModified="165b7b48b60">
+         <source file="..\..\..\stm_lib\src\misc.c" lastModified="165993c3b10"/>
+      </target>
+      <target file="startup_stm32f10x_md.o" lastModified="165b7b47710">
+         <source file="..\..\..\cmsis_boot\startup\startup_stm32f10x_md.c" lastModified="165993cc7b0"/>
+      </target>
+      <target file="stm32f10x_flash.o" lastModified="165b7b48967">
+         <source file="..\..\..\stm_lib\src\stm32f10x_flash.c" lastModified="165993c1018"/>
+      </target>
+      <target file="stm32f10x_gpio.o" lastModified="165b7b47792">
+         <source file="..\..\..\stm_lib\src\stm32f10x_gpio.c" lastModified="165993c0848"/>
+      </target>
+      <target file="stm32f10x_rtc.o" lastModified="165b7b472da">
+         <source file="..\..\..\stm_lib\src\stm32f10x_rtc.c" lastModified="165993becf0"/>
+      </target>
+      <target file="stm32f10x_exti.o" lastModified="165b7b4860f">
+         <source file="..\..\..\stm_lib\src\stm32f10x_exti.c" lastModified="165993c17e8"/>
+      </target>
+      <target file="system_stm32f10x.o" lastModified="165b7b4751e">
+         <source file="..\..\..\cmsis_boot\system_stm32f10x.c" lastModified="165993e32f8"/>
+      </target>
+      <target file="sx1276-Fsk.o" lastModified="165b7b47605">
+         <source file="..\..\..\LORA\sx1276-Fsk.c" lastModified="165993d8718"/>
+      </target>
+      <target file="stm32f10x_adc.o" lastModified="165b7b4879f">
+         <source file="..\..\..\stm_lib\src\stm32f10x_adc.c" lastModified="165993c3340"/>
+      </target>
+      <target file="stm32f10x_tim.o" lastModified="165b7b474c0">
+         <source file="..\..\..\stm_lib\src\stm32f10x_tim.c" lastModified="165993aaca0"/>
+      </target>
+      <target file="ssd1306_i2c.o" lastModified="165b7b489db">
+         <source file="..\..\..\OLED SSD1306\ssd1306_i2c.c" lastModified="165993cdf20"/>
+      </target>
+      <target file="sx1276-Hal.o" lastModified="165b7b48434">
+         <source file="..\..\..\LORA\sx1276-Hal.c" lastModified="165993d6008"/>
+      </target>
+      <target file="stm32f10x_dma.o" lastModified="165b7b48a4b">
+         <source file="..\..\..\stm_lib\src\stm32f10x_dma.c" lastModified="165993c23a0"/>
+      </target>
+      <target file="main.o" lastModified="165ba056d15">
+         <source file="..\..\..\main.c" lastModified="165ba055de8"/>
+      </target>
+      <target file="stm32f10x_usart.o" lastModified="165b7b488b6">
+         <source file="..\..\..\stm_lib\src\stm32f10x_usart.c" lastModified="165993aa0e8"/>
+      </target>
+   </processor>
+</history>
